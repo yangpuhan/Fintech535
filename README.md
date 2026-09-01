@@ -1,12 +1,19 @@
-# Options Surface Lab
+# Fintech 535
 
-MENG FinTech · Algorithmic Trading II · **Assignment 1.1**
+MENG FinTech · Algorithmic Trading II
 
-An interactive Reflex page over expired UUUU option contracts pulled from LSEG.
-The argument it makes: listed options are a sparse cloud, not a filled sheet,
-and the number an exchange marks a contract at is not the price anyone paid.
+One Reflex site, built up over the semester. Each assignment adds a module and
+a page rather than a new project, so `rxconfig.py` and `requirements.txt` stay
+at the root and everything shares the same theme.
 
-The assignment brief is in [`options_surface_lab/README.md`](options_surface_lab/README.md).
+## Assignments
+
+| # | Module | What it does |
+|---|---|---|
+| 1.1 | [`options_surface_lab/`](options_surface_lab/) | Expired UUUU option contracts from LSEG. Listed options are a sparse cloud, not a filled sheet — and the number an exchange marks a contract at is not the price anyone paid. |
+
+Each module keeps the instructor's brief next to the code — 1.1's is in
+[`options_surface_lab/README.md`](options_surface_lab/README.md).
 
 ---
 
