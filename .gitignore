@@ -1,0 +1,25 @@
+assets/external/
+*.db
+*.py[cod]
+__pycache__/
+.states
+.web
+reflex.lock/
+
+# macOS / editor cruft
+.DS_Store
+.spyproject/
+
+# Virtual environment
+.venv/
+venv/
+
+# LSEG credentials — never commit the app key
+lseg-data.config.json
+
+# Superseded starter cache (TRDPRC_1 only, no mark field)
+option_pipeline_data.pkl
+
+# NOTE: options_surface_lab/option_surface_data.pkl is deliberately NOT ignored.
+# The assignment requires the site to render from the repo, and it renders off
+# that pickle. It holds prices only — no credentials.

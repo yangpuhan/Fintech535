@@ -1,0 +1,107 @@
+# Options Surface Lab
+
+MENG FinTech · Algorithmic Trading II · **Assignment 1.1**
+
+An interactive Reflex page over expired UUUU option contracts pulled from LSEG.
+The argument it makes: listed options are a sparse cloud, not a filled sheet,
+and the number an exchange marks a contract at is not the price anyone paid.
+
+The assignment brief is in [`options_surface_lab/README.md`](options_surface_lab/README.md).
+
+---
+
+## Run it
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+reflex run
+```
+
+Then open http://localhost:3000. The page reads
+`options_surface_lab/option_surface_data.pkl`, which is committed — no LSEG
+session or credentials needed to render the site.
+
+For a static version with no dev server (useful for a demo):
+
+```bash
+python -m options_surface_lab.build_preview
+open options_surface_lab/options_surface_preview.html
+```
+
+To re-pull from LSEG (needs Workspace running and a valid app key in
+`lseg-data.config.json`, which is gitignored):
+
+```bash
+python -m options_surface_lab.option_surface_fetch
+```
+
+---
+
+## The field the brief asks for does not exist
+
+The brief names `SETTLE` as the exchange mark. On this universe LSEG answers:
+
+```
+TSCC.QS.UserRequestError.90006
+The universe does not support the following fields: [SETTLE]
+```
+
+Every `SETTLE` column came back all-NaN and was dropped by the starter's
+`dropna(how="all", axis=1)`, which is why the original cache held nothing but
+`TRDPRC_1` — and why the two required statistics were `0%` and `n/a`.
+
+`THEO_VALUE` is the substitute. It plays exactly the role the brief describes
+for SETTLE — a model-ish number that prints on more series than trades do:
+
+| as-of | listed call cells | carried a mark | actually traded |
+|---|---|---|---|
+| 2026-06-12 | 275 | 142 | 80 |
+| 2026-07-10 | 226 | 208 | 114 |
+| 2026-08-14 | 85 | 83 | 64 |
+
+`BID` and `ASK` came along on the same pull, so "what would you actually get
+filled at" has a real answer rather than a shrug, and `IMP_VOLT` is already
+cached for the volatility surface in 1.2.
+
+**Roles used throughout the code:** `THEO_VALUE` is the mark, `TRDPRC_1` is
+evidence that someone traded. Both names live in
+[`option_surface_theme.py`](options_surface_lab/option_surface_theme.py) as
+`MARK_FIELD` / `PRINT_FIELD` so the naming never drifts.
+
+---
+
+## Files
+
+| File | What it is |
+|---|---|
+| `options_surface_app.py` | The Reflex page |
+| `option_surface_data.pkl` | LSEG cache — 313 expired contracts, 8 fields, 12 expiries |
+| `option_surface_utils.py` | RIC parsing, tidy/long reshape, sparsity statistics |
+| `option_surface_plots.py` | Every Plotly figure |
+| `option_surface_theme.py` | The palette and field roles, in one place |
+| `option_surface_fetch.py` | The LSEG pull (only runs if you ask it to) |
+| `build_preview.py` | Static HTML build of the same figures |
+
+`class_1.py` is the original in-class starter, kept for reference. It is no
+longer the Reflex entry point — `rxconfig.py` points at
+`options_surface_lab.options_surface_app`.
+
+---
+
+## Graphical identity — "Paper"
+
+Warm paper ground, ink text, two accents, serif for prose and mono for
+anything numeric. Defined once in `option_surface_theme.py`.
+
+The accent assignment carries the argument: the **mark** (`THEO_VALUE`) is
+everywhere, so it gets muted Prussian blue; a **real trade** (`TRDPRC_1`) is
+rare, so it gets vermilion. The rare thing gets the loud colour, so the eye
+lands on how few real prints there are.
+
+```
+PAPER  #FAF8F3      MARK   #2D5F7C   Prussian blue
+CARD   #FFFFFF      PRINT  #C1440E   vermilion
+RULE   #DDD7CA      WASH   #EFEBE2   a listed cell that never quoted
+INK    #1A1A1A      MUTED  #6E6A63
+```
