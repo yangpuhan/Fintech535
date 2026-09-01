@@ -15,6 +15,28 @@ at the root and everything shares the same theme.
 Each module keeps the instructor's brief next to the code — 1.1's is in
 [`options_surface_lab/README.md`](options_surface_lab/README.md).
 
+**Published site:** https://yangpuhan.github.io/Fintech535/
+
+---
+
+## Two builds of the same thing
+
+Reflex is full-stack — the figures live in `rx.State` on a Python backend and
+reach the browser over a websocket. GitHub Pages serves files and nothing else,
+so the Reflex app cannot run there.
+
+So there are two builds, and neither duplicates the plotting logic:
+
+| | Reflex app | Static build |
+|---|---|---|
+| entry | `reflex run` | `docs/` on GitHub Pages |
+| figures | `option_surface_plots.py` | the same functions, dumped to JSON |
+| controls | server-side event handlers | the same controls, switched in the browser |
+
+`build_site.py` calls the identical figure functions and writes one JSON bundle
+per (as-of date, right); the page fetches the bundle it needs. Every control on
+the Reflex page still works on the static one.
+
 ---
 
 ## Run it
@@ -34,6 +56,12 @@ For a static version with no dev server (useful for a demo):
 ```bash
 python -m options_surface_lab.build_preview
 open options_surface_lab/options_surface_preview.html
+```
+
+To rebuild the published site into `docs/` (commit and push to deploy):
+
+```bash
+python -m options_surface_lab.build_site
 ```
 
 To re-pull from LSEG (needs Workspace running and a valid app key in
@@ -70,6 +98,24 @@ for SETTLE — a model-ish number that prints on more series than trades do:
 `BID` and `ASK` came along on the same pull, so "what would you actually get
 filled at" has a real answer rather than a shrug, and `IMP_VOLT` is already
 cached for the volatility surface in 1.2.
+
+## And the RIC scheme is wrong for puts
+
+Appendix A says the `^` suffix "repeats the month letter and year". For calls
+it does. For puts it does not, and following the brief returns
+`TS.Interday.UserRequestError.70005, The universe is not found` on every put:
+
+```
+UUUUT212601500.U^T26   put code in the suffix    -> not found
+UUUUT212601500.U^H26   call code in the suffix   -> resolves
+        ↑         ↑
+        T = Aug put (body)
+                  H = Aug call (chain suffix)
+```
+
+The suffix names the expiry *chain*, which is keyed off the call code whatever
+the contract's own right. The first pull followed the brief and came back with
+313 calls and zero puts.
 
 **Roles used throughout the code:** `THEO_VALUE` is the mark, `TRDPRC_1` is
 evidence that someone traded. Both names live in

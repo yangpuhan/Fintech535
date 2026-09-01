@@ -150,6 +150,9 @@ def price_surface_figure(
                 x=m["strike"], y=m["dte"], z=m[MARK_FIELD],
                 mode="markers",
                 name=f"{MARK_FIELD} (mark)",
+                # `meta.role` lets the static build's JS toggle traces by role
+                # instead of guessing at indices that shift when one is absent.
+                meta=dict(role="mark"),
                 marker=dict(size=3.5, color=MARK, opacity=0.75, symbol="circle", line=dict(width=0)),
                 customdata=np.stack([m["ric"].astype(str)], axis=1),
                 hovertemplate=(
@@ -165,6 +168,7 @@ def price_surface_figure(
                     go.Surface(
                         x=grid["x"], y=grid["y"], z=grid["z"],
                         name="interpolated sheet",
+                        meta=dict(role="sheet"),
                         colorscale=[[0, "#EAF0F4"], [1, MARK_SOFT]],
                         opacity=0.35,
                         showscale=False,
@@ -180,6 +184,7 @@ def price_surface_figure(
                 x=t["strike"], y=t["dte"], z=t[PRINT_FIELD],
                 mode="markers",
                 name=f"{PRINT_FIELD} (a real trade)",
+                meta=dict(role="print"),
                 marker=dict(size=5.5, color=PRINT, opacity=0.95, symbol="diamond",
                             line=dict(width=0.5, color="#8A2F08")),
                 customdata=np.stack([t["ric"].astype(str), t["ACVOL_UNS"].fillna(0)], axis=1),

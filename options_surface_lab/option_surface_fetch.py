@@ -52,11 +52,26 @@ DATA_FILE = Path(__file__).with_name("option_surface_data.pkl")
 
 
 def build_ric(expiry: dt.date, strike: float, cp: str, root: str = "UUUU") -> str:
-    """OPRA-style expired-contract RIC: {ROOT}{M}{DD}{YY}{SSSSS}.U^{M}{YY}."""
-    code = chr(ord("A") + expiry.month - 1) if cp == "C" else chr(ord("M") + expiry.month - 1)
+    """
+    OPRA-style expired-contract RIC: ``{ROOT}{M}{DD}{YY}{SSSSS}.U^{M}{YY}``.
+
+    The brief's Appendix A says the ``^`` suffix "repeats the month letter",
+    and for calls it does. For puts it does not, and following the brief
+    returns ``TS.Interday.UserRequestError.70005, The universe is not found``
+    on every put in the window::
+
+        UUUUT212601500.U^T26   put code in the suffix   -> not found
+        UUUUT212601500.U^H26   call code in the suffix  -> resolves
+
+    The suffix names the expiry *chain*, which is keyed off the call code
+    regardless of the contract's own right. Getting this wrong is why the
+    first pull came back with 313 calls and zero puts.
+    """
+    body = chr(ord("A") + expiry.month - 1) if cp == "C" else chr(ord("M") + expiry.month - 1)
+    chain = chr(ord("A") + expiry.month - 1)
     return (
-        f"{root.upper()}{code}{expiry:%d}{expiry:%y}"
-        f"{int(round(strike * 100)):05d}.U^{code}{expiry:%y}"
+        f"{root.upper()}{body}{expiry:%d}{expiry:%y}"
+        f"{int(round(strike * 100)):05d}.U^{chain}{expiry:%y}"
     )
 
 
