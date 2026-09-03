@@ -2,159 +2,122 @@
 
 MENG FinTech · Algorithmic Trading II
 
-One Reflex site, built up over the semester. Each assignment adds a module and
-a page rather than a new project, so `rxconfig.py` and `requirements.txt` stay
-at the root and everything shares the same theme.
+One site, built up over the semester. Each assignment adds a module and a
+section rather than a new project.
 
 ## Assignments
 
-| # | Module | What it does |
-|---|---|---|
-| 1.1 | [`options_surface_lab/`](options_surface_lab/) | Expired UUUU option contracts from LSEG. Listed options are a sparse cloud, not a filled sheet — and the number an exchange marks a contract at is not the price anyone paid. |
-
-Each module keeps the instructor's brief next to the code — 1.1's is in
-[`options_surface_lab/README.md`](options_surface_lab/README.md).
-
-**Published site:** https://yangpuhan.github.io/Fintech535/
+| # | Module | Published | What it does |
+|---|---|---|---|
+| 1.1 | [`options_surface_lab/`](options_surface_lab/) | **https://yangpuhan.github.io/Fintech535/** | Expired UUUU option contracts from LSEG. Listed options are a sparse cloud, not a filled sheet — and the closing mid is not a price anyone paid. |
 
 ---
 
-## Two builds of the same thing
+## How it is put together
 
-Reflex is full-stack — the figures live in `rx.State` on a Python backend and
-reach the browser over a websocket. GitHub Pages serves files and nothing else,
-so the Reflex app cannot run there.
+GitHub Pages serves files and nothing else, so there is no server to compute a
+figure on demand. Every (as-of date, right) combination is rendered ahead of
+time to one JSON bundle, and the page fetches the bundle it needs when a
+control changes.
 
-So there are two builds, and neither duplicates the plotting logic:
+The controls all stay live — as-of date, call/put, and the three layer
+switches — because the switching happens in the browser. A viewer loads about
+90 KB per view rather than the whole 10 MB.
 
-| | Reflex app | Static build |
-|---|---|---|
-| entry | `reflex run` | `docs/` on GitHub Pages |
-| figures | `option_surface_plots.py` | the same functions, dumped to JSON |
-| controls | server-side event handlers | the same controls, switched in the browser |
+Python does the data work and the drawing; the browser does the switching.
+There is no second copy of the plotting logic.
 
-`build_site.py` calls the identical figure functions and writes one JSON bundle
-per (as-of date, right); the page fetches the bundle it needs. Every control on
-the Reflex page still works on the static one.
-
----
+```
+options_surface_lab/
+  ric.py       build and parse OPRA RICs for expired contracts
+  fetch.py     the LSEG pull  →  data.pkl        (run once, by hand)
+  data.pkl     the cache: 626 contracts, 12 expiries, 7 fields
+  panel.py     pickle → tidy long table → one row per (date, contract) → statistics
+  theme.py     the graphical identity, and the two field roles
+  figures.py   every Plotly figure
+  build.py     → docs/                            (what Pages serves)
+```
 
 ## Run it
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-reflex run
+
+python -m options_surface_lab.build      # rebuild docs/
+python -m http.server --directory docs   # then open localhost:8000
 ```
 
-Then open http://localhost:3000. The page reads
-`options_surface_lab/option_surface_data.pkl`, which is committed — no LSEG
-session or credentials needed to render the site.
+Committing and pushing `docs/` republishes the site.
 
-For a static version with no dev server (useful for a demo):
-
-```bash
-python -m options_surface_lab.build_preview
-open options_surface_lab/options_surface_preview.html
-```
-
-To rebuild the published site into `docs/` (commit and push to deploy):
+To re-pull from LSEG — needs Workspace running and an app key in
+`lseg-data.config.json`, which is gitignored:
 
 ```bash
-python -m options_surface_lab.build_site
-```
-
-To re-pull from LSEG (needs Workspace running and a valid app key in
-`lseg-data.config.json`, which is gitignored):
-
-```bash
-python -m options_surface_lab.option_surface_fetch
+python -m options_surface_lab.fetch
 ```
 
 ---
 
-## The field the brief asks for does not exist
+## Two things the brief gets wrong about the data
 
-The brief names `SETTLE` as the exchange mark. On this universe LSEG answers:
+**There is no settlement price.** `SETTLE` is rejected on this RIC space —
+`the universe does not support the following fields: [SETTLE]` — and
+`TR.SettlementPrice` comes back empty. The brief now says as much, and names
+`MID_PRICE`, the closing NBBO midpoint, as the mark. That is what this app
+uses.
 
-```
-TSCC.QS.UserRequestError.90006
-The universe does not support the following fields: [SETTLE]
-```
-
-Every `SETTLE` column came back all-NaN and was dropped by the starter's
-`dropna(how="all", axis=1)`, which is why the original cache held nothing but
-`TRDPRC_1` — and why the two required statistics were `0%` and `n/a`.
-
-`THEO_VALUE` is the substitute. It plays exactly the role the brief describes
-for SETTLE — a model-ish number that prints on more series than trades do:
-
-| as-of | listed call cells | carried a mark | actually traded |
-|---|---|---|---|
-| 2026-06-12 | 275 | 142 | 80 |
-| 2026-07-10 | 226 | 208 | 114 |
-| 2026-08-14 | 85 | 83 | 64 |
-
-`BID` and `ASK` came along on the same pull, so "what would you actually get
-filled at" has a real answer rather than a shrug, and `IMP_VOLT` is already
-cached for the volatility surface in 1.2.
-
-## And the RIC scheme is wrong for puts
-
-Appendix A says the `^` suffix "repeats the month letter and year". For calls
-it does. For puts it does not, and following the brief returns
-`TS.Interday.UserRequestError.70005, The universe is not found` on every put:
+**The RIC scheme in Appendix A is wrong for puts.** It says the `^` suffix
+"repeats the month letter". For calls it does. For puts it does not:
 
 ```
-UUUUT212601500.U^T26   put code in the suffix    -> not found
-UUUUT212601500.U^H26   call code in the suffix   -> resolves
+UUUUT212601500.U^T26   put code in the suffix    →  universe is not found
+UUUUT212601500.U^H26   call code in the suffix   →  resolves
         ↑         ↑
         T = Aug put (body)
                   H = Aug call (chain suffix)
 ```
 
-The suffix names the expiry *chain*, which is keyed off the call code whatever
-the contract's own right. The first pull followed the brief and came back with
-313 calls and zero puts.
-
-**Roles used throughout the code:** `THEO_VALUE` is the mark, `TRDPRC_1` is
-evidence that someone traded. Both names live in
-[`option_surface_theme.py`](options_surface_lab/option_surface_theme.py) as
-`MARK_FIELD` / `PRINT_FIELD` so the naming never drifts.
+The suffix names the expiry *chain*, and the chain is keyed off the call code
+whatever the contract's own right is. Following the appendix literally returns
+zero puts — with no error, just an empty frame. `ric.py` builds the suffix from
+the call code and parses the right off the body.
 
 ---
 
-## Files
+## What the numbers say
 
-| File | What it is |
+Busiest session in the window, 2026-07-10, calls:
+
+| | |
 |---|---|
-| `options_surface_app.py` | The Reflex page |
-| `option_surface_data.pkl` | LSEG cache — 313 expired contracts, 8 fields, 12 expiries |
-| `option_surface_utils.py` | RIC parsing, tidy/long reshape, sparsity statistics |
-| `option_surface_plots.py` | Every Plotly figure |
-| `option_surface_theme.py` | The palette and field roles, in one place |
-| `option_surface_fetch.py` | The LSEG pull (only runs if you ask it to) |
-| `build_preview.py` | Static HTML build of the same figures |
+| listed cells on the grid | 226 |
+| carried a closing mid | 150 |
+| actually traded | 114 |
+| **% mid with no trade** | **44%** |
+| **median \|MID_PRICE − TRDPRC_1\|** | **$0.033** (5%) |
+| never traded, of the whole grid | 63% |
+| nothing quoted at all | 20% |
 
-`class_1.py` is the original in-class starter, kept for reference. It is no
-longer the Reflex entry point — `rxconfig.py` points at
-`options_surface_lab.options_surface_app`.
+30 of those 114 trades have no mid at all — by the close the bid had gone away,
+so there was nothing left to take a midpoint of. The holes are not only in the
+mark; they are in the evidence too.
 
 ---
 
 ## Graphical identity — "Paper"
 
-Warm paper ground, ink text, two accents, serif for prose and mono for
-anything numeric. Defined once in `option_surface_theme.py`.
+Warm paper ground, ink text, two accents. Serif for prose, mono for anything
+numeric. Defined once in `theme.py`.
 
-The accent assignment carries the argument: the **mark** (`THEO_VALUE`) is
+The accent assignment carries the argument: the **mid** (`MID_PRICE`) is nearly
 everywhere, so it gets muted Prussian blue; a **real trade** (`TRDPRC_1`) is
 rare, so it gets vermilion. The rare thing gets the loud colour, so the eye
 lands on how few real prints there are.
 
 ```
-PAPER  #FAF8F3      MARK   #2D5F7C   Prussian blue
-CARD   #FFFFFF      PRINT  #C1440E   vermilion
+PAPER  #FAF8F3      MARK   #2D5F7C   Prussian blue · MID_PRICE
+CARD   #FFFFFF      PRINT  #C1440E   vermilion · TRDPRC_1
 RULE   #DDD7CA      WASH   #EFEBE2   a listed cell that never quoted
 INK    #1A1A1A      MUTED  #6E6A63
 ```

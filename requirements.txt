@@ -1,9 +1,8 @@
-reflex==0.9.8.post1
 plotly==6.9.0
 pandas==2.3.3
 numpy==2.5.2
 scipy==1.18.1
 
-# Only needed to re-pull from LSEG (option_surface_fetch.py). The site itself
-# renders from the cached pickle and never touches this.
+# Only needed to re-pull from LSEG (options_surface_lab/fetch.py).
+# The published site is static and never imports this.
 lseg-data==2.1.1

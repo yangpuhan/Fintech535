@@ -1,37 +1,39 @@
 """
-Graphical identity for the lab — "Paper".
+Graphical identity — "Paper".
 
-One place for the palette so the Reflex page and every Plotly figure agree.
+One module owns the palette, the type, and the two field roles, so the
+figures and the page cannot drift apart.
+
 Light, printed-page feel: warm paper ground, ink text, two accents.
 
-The two accents carry the whole argument of this assignment:
+The accents carry the argument of the assignment:
 
-    MARK  (THEO_VALUE) — dense, it is everywhere        -> muted Prussian blue
-    PRINT (TRDPRC_1)   — sparse, someone actually traded -> vermilion
+    MARK  (MID_PRICE) — exists nearly everywhere  -> muted Prussian blue
+    PRINT (TRDPRC_1)  — someone actually traded   -> vermilion
 
-The rare thing gets the loud color. That is deliberate: the eye should land
-on how *few* real prints there are.
+The rare thing gets the loud colour on purpose. The eye should land on how
+*few* real prints there are, not on the comfortable blanket of mids.
 """
 
 from __future__ import annotations
 
 # ── ground ──────────────────────────────────────────────────────────────
-PAPER = "#FAF8F3"     # page background, warm off-white
-CARD = "#FFFFFF"      # raised panel
-RULE = "#DDD7CA"      # hairline borders / grid
-WASH = "#EFEBE2"      # empty heatmap cell — present but silent
+PAPER = "#FAF8F3"      # page, warm off-white
+CARD = "#FFFFFF"       # raised panel
+RULE = "#DDD7CA"       # hairlines, grid
+WASH = "#EFEBE2"       # a listed cell that never quoted
 
 # ── ink ─────────────────────────────────────────────────────────────────
-INK = "#1A1A1A"       # primary text
-INK_MUTED = "#6E6A63" # captions, axis labels
+INK = "#1A1A1A"
+INK_MUTED = "#6E6A63"
 INK_FAINT = "#A29D93"
 
 # ── accents ─────────────────────────────────────────────────────────────
-MARK = "#2D5F7C"      # Prussian blue  — THEO_VALUE, the model mark
+MARK = "#2D5F7C"       # Prussian blue — MID_PRICE
 MARK_SOFT = "#8FB3C7"
-PRINT = "#C1440E"     # vermilion      — TRDPRC_1, an actual trade
+PRINT = "#C1440E"      # vermilion — TRDPRC_1
 PRINT_SOFT = "#E39B7B"
-SPREAD = "#7A6A55"    # bid/ask band
+QUOTE = "#7A6A55"      # the bid/ask band
 
 # ── type ────────────────────────────────────────────────────────────────
 SERIF = "'Source Serif 4', 'Source Serif Pro', Georgia, serif"
@@ -44,13 +46,16 @@ FONT_URL = (
     "&display=swap"
 )
 
-# Field roles — imported by utils and plots so the naming never drifts.
-MARK_FIELD = "THEO_VALUE"
+# ── field roles ─────────────────────────────────────────────────────────
+# The brief is explicit: MID_PRICE is the closing NBBO midpoint and the
+# closest mark-of-the-close available, because LSEG exposes no settlement
+# price for expired US equity options.
+MARK_FIELD = "MID_PRICE"
 PRINT_FIELD = "TRDPRC_1"
 
 
-def plotly_layout(**overrides) -> dict:
-    """Shared Plotly layout so every figure reads as one system."""
+def layout(**overrides) -> dict:
+    """Shared Plotly layout, so every figure reads as one system."""
     base = dict(
         template="simple_white",
         paper_bgcolor=PAPER,
@@ -58,41 +63,21 @@ def plotly_layout(**overrides) -> dict:
         font=dict(color=INK, family=SERIF, size=13),
         title=dict(
             font=dict(size=17, color=INK, family=SERIF),
-            x=0.0,
-            xanchor="left",
-            y=0.97,
-            yanchor="top",
+            x=0.0, xanchor="left", y=0.97, yanchor="top",
         ),
         margin=dict(l=64, r=24, t=76, b=52),
         legend=dict(
             bgcolor="rgba(255,255,255,0.85)",
-            bordercolor=RULE,
-            borderwidth=1,
+            bordercolor=RULE, borderwidth=1,
             font=dict(size=11, family=MONO),
         ),
         hoverlabel=dict(
-            bgcolor=CARD,
-            bordercolor=RULE,
+            bgcolor=CARD, bordercolor=RULE,
             font=dict(family=MONO, size=12, color=INK),
         ),
     )
     base.update(overrides)
     return base
-
-
-def caption(text: str, y: float = 1.02) -> dict:
-    """Small grey note pinned above a figure."""
-    return dict(
-        text=text,
-        xref="paper",
-        yref="paper",
-        x=0.0,
-        y=y,
-        xanchor="left",
-        yanchor="bottom",
-        showarrow=False,
-        font=dict(size=11, color=INK_MUTED, family=MONO),
-    )
 
 
 def axis(title: str | None = None, **overrides) -> dict:
@@ -105,3 +90,13 @@ def axis(title: str | None = None, **overrides) -> dict:
     )
     cfg.update(overrides)
     return cfg
+
+
+def caption(text: str, y: float = 1.02) -> dict:
+    """Grey note pinned above a figure."""
+    return dict(
+        text=text, xref="paper", yref="paper",
+        x=0.0, y=y, xanchor="left", yanchor="bottom",
+        showarrow=False,
+        font=dict(size=11, color=INK_MUTED, family=MONO),
+    )
