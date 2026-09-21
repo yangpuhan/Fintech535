@@ -35,7 +35,9 @@ from .theme import (
     PAPER, PRINT, PRINT_FIELD, RULE, SERIF, WASH,
 )
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+# 1.1 moved down a level when 1.2 took the root. The page only ever fetches
+# relative paths (meta.json, figures/*.json), so the move costs nothing.
+DOCS = Path(__file__).resolve().parents[1] / "docs" / "1.1"
 
 
 def _json(obj) -> str:
@@ -102,8 +104,7 @@ def build_site() -> Path:
     }), encoding="utf-8")
 
     (DOCS / "index.html").write_text(page(underlying), encoding="utf-8")
-    # Pages runs Jekyll by default and would skip files it does not recognise.
-    (DOCS / ".nojekyll").write_text("", encoding="utf-8")
+    # .nojekyll lives at the site root now, written by the 1.2 build.
 
     size = sum(f.stat().st_size for f in DOCS.rglob("*") if f.is_file())
     n = len(list((DOCS / "figures").glob("*.json")))
@@ -169,12 +170,26 @@ def page(underlying: str) -> str:
   footer {{ border-top:1px solid var(--rule); margin-top:44px; padding-top:16px;
             font-family:var(--mono); font-size:12px; color:var(--muted); line-height:1.7; }}
   #status {{ font-family:var(--mono); font-size:11px; color:var(--muted); }}
+  nav {{ display:flex; gap:18px; align-items:baseline; font-family:var(--mono);
+         font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+         color:var(--muted); margin-bottom:26px; flex-wrap:wrap; }}
+  nav a {{ color:var(--muted); text-decoration:none;
+           border-bottom:1px solid var(--rule); }}
+  nav a:hover {{ color:var(--ink); border-color:var(--ink); }}
+  nav .here {{ color:var(--ink); font-weight:600; border-bottom:2px solid var(--ink); }}
   @media (max-width:700px) {{ h1 {{ font-size:32px; }} .toggles {{ margin-left:0; }}
                               .controls {{ position:static; }} }}
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <nav>
+    <a href="../">1.2 · Covered Call</a>
+    <span class="here">1.1 · Option Surface Lab</span>
+    <a href="../data.html">Data</a>
+    <a href="https://github.com/yangpuhan/Fintech535">Source</a>
+  </nav>
 
   <div class="masthead">
     <div class="kicker">MENG FinTech · Algorithmic Trading II · Assignment 1.1</div>
@@ -275,7 +290,9 @@ def page(underlying: str) -> str:
 
   <footer>
     Data from LSEG · mark = {MARK_FIELD} (closing NBBO mid) · print = {PRINT_FIELD} (last trade)<br>
-    Figures pre-rendered from the cached pickle; controls run in the browser.
+    Figures pre-rendered from the cached pickle; controls run in the browser.<br>
+    <a href="../" style="color:var(--muted)">Assignment 1.2 · Covered Call Backtest</a> ·
+    <a href="https://github.com/yangpuhan/Fintech535" style="color:var(--muted)">github.com/yangpuhan/Fintech535</a>
   </footer>
 </div>
 

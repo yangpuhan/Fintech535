@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data · Covered Call Backtest</title>
+<meta name="description" content="Where the numbers came from, and why this page cannot fetch new ones on GitHub Pages.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper:#FAF8F3; --card:#FFFFFF; --rule:#DDD7CA; --wash:#EFEBE2;
+    --ink:#1A1A1A; --muted:#6E6A63; --faint:#A29D93;
+    --s-nav:#1D6091; --s-req:#C1440E; --s-avail:#2C7A2C;
+    --serif:'Source Serif 4','Source Serif Pro',Georgia,serif;
+    --mono:'Source Code Pro','SF Mono',Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--serif); }
+  .wrap { max-width:900px; margin:0 auto; padding:34px 24px 72px; }
+  nav { display:flex; gap:18px; align-items:baseline; font-family:var(--mono);
+        font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+        color:var(--muted); margin-bottom:26px; flex-wrap:wrap; }
+  nav a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--rule); }
+  nav a:hover { color:var(--ink); border-color:var(--ink); }
+  nav .here { color:var(--ink); font-weight:600; border-bottom:2px solid var(--ink); }
+  .masthead { border-bottom:2px solid var(--ink); padding-bottom:18px; }
+  .kicker { font-family:var(--mono); font-size:11px; color:var(--muted);
+            letter-spacing:.1em; text-transform:uppercase; }
+  h1 { font-size:40px; margin:6px 0 0; font-weight:700; letter-spacing:-.015em; }
+  h2 { font-size:21px; margin:42px 0 8px; font-weight:700; }
+  p { line-height:1.62; max-width:76ch; }
+  .lede { font-size:17px; color:var(--muted); margin:12px 0 0; }
+  .state { display:flex; gap:14px; align-items:flex-start; margin:26px 0 0;
+           background:var(--card); border:1px solid var(--rule); border-left-width:4px;
+           border-radius:4px; padding:18px 20px; }
+  .state.off { border-left-color:var(--s-req); }
+  .state.on  { border-left-color:var(--s-avail); }
+  .state.wait { border-left-color:var(--faint); }
+  .state .ic { font-family:var(--mono); font-weight:700; font-size:18px; line-height:1.3; }
+  .state.off .ic { color:var(--s-req); } .state.on .ic { color:var(--s-avail); }
+  .state.wait .ic { color:var(--faint); }
+  .state h3 { margin:0 0 5px; font-size:17px; font-weight:700; }
+  .state p { margin:0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  table { border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12.5px;
+          background:var(--card); border:1px solid var(--rule); border-radius:4px; }
+  th { text-align:left; padding:9px 12px; font-size:10.5px; letter-spacing:.06em;
+       text-transform:uppercase; color:var(--muted); background:var(--wash);
+       border-bottom:1px solid var(--rule); }
+  th.r, td.r { text-align:right; }
+  td { padding:7px 12px; border-bottom:1px solid var(--wash);
+       font-variant-numeric:tabular-nums; }
+  code { font-family:var(--mono); background:var(--wash); padding:1px 5px;
+         border-radius:3px; font-size:.92em; }
+  pre { font-family:var(--mono); font-size:12.5px; background:var(--card);
+        border:1px solid var(--rule); border-radius:4px; padding:14px 16px;
+        overflow:auto; line-height:1.7; }
+  .note { background:var(--wash); border:1px solid var(--rule); border-radius:4px;
+          padding:15px 18px; font-size:14px; color:var(--muted); line-height:1.65;
+          max-width:80ch; margin-top:18px; }
+  .note b { color:var(--ink); }
+  footer { border-top:1px solid var(--ink); margin-top:56px; padding-top:18px;
+           font-family:var(--mono); font-size:12px; color:var(--muted); line-height:1.8; }
+  footer a { color:var(--muted); }
+  @media (max-width:700px) { h1 { font-size:30px; } .wrap { padding:24px 16px 56px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a href="./">1.2 · Covered Call</a>
+  <a href="1.1/">1.1 · Option Surface Lab</a>
+  <span class="here">Data</span>
+  <a href="https://github.com/yangpuhan/Fintech535">Source</a>
+</nav>
+
+<div class="masthead">
+  <div class="kicker">MENG FinTech · Algorithmic Trading II</div>
+  <h1>Data</h1>
+  <p class="lede">Where the numbers came from, and why this page cannot go and get
+     new ones.</p>
+</div>
+
+<div class="state wait" id="state">
+  <div class="ic">…</div>
+  <div><h3>Checking for a local data connection</h3>
+    <p>Looking for the fetch server on <code>127.0.0.1:8765</code>.</p></div>
+</div>
+
+<h2>The cached pull</h2>
+<p>Everything the published site shows was pulled once from LSEG and baked into
+   <code>book.js</code>. GitHub Pages serves files and nothing else, so the backtest
+   cannot be re-run in the browser and the tape cannot be refreshed from it.</p>
+<table id="provenance"><tbody></tbody></table>
+
+<h2>Chain resolution</h2>
+<p>Synthetic RICs name contracts that may never have listed. Requests go out in
+   batches and split on failure, so one dead name costs a bisect rather than the whole
+   batch. This is what resolved, per expiry.</p>
+<table id="chain">
+  <thead><tr><th>expiry</th><th class="r">requested</th><th class="r">resolved</th>
+    <th class="r">rate</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>Running it locally</h2>
+<p>The fetcher is a tool, not part of the published site. It needs LSEG Workspace
+   running and an app key in <code>lseg-data.config.json</code>, which is gitignored
+   and never leaves the machine.</p>
+<pre>python -m covered_call.fetch    # LSEG  ->  covered_call/data.pkl
+python -m covered_call.build    # data.pkl  ->  docs/book.js
+
+python covered_call/local_server.py
+# http://127.0.0.1:8765/data.html</pre>
+
+<div class="note">
+  <b>Why the published site has no live connection.</b> An app key that reaches a
+  market data entitlement is a credential. Publishing a page that could use one would
+  mean either shipping the key to every visitor or standing up a proxy that spends the
+  entitlement on their behalf. Neither is something a coursework site should do, so the
+  boundary is drawn at the pickle: the pull happens on a machine that is entitled, and
+  what gets published is the result.
+</div>
+
+<footer>
+  Data from LSEG · <span id="foot"></span><br>
+  <a href="./">Back to the backtest</a> ·
+  <a href="https://github.com/yangpuhan/Fintech535">github.com/yangpuhan/Fintech535</a>
+</footer>
+</div>
+
+<script src="book.js"></script>
+<script>
+'use strict';
+const M = window.BOOK.meta;
+const fmt = n => n.toLocaleString('en-US');
+
+document.querySelector('#provenance tbody').innerHTML = [
+  ['underlying', `${M.ticker} (${M.stock_ric})`],
+  ['bar size', `${M.interval} — same for stock and options`],
+  ['order timestamp', `${String(M.order_hour_utc).padStart(2, '0')}:00 UTC each entry session`],
+  ['window', `${M.first_bar} → ${M.last_bar}`],
+  ['stock bars', `${fmt(M.n_bars)} over ${M.n_sessions} sessions`],
+  ['expired call contracts', fmt(M.n_contracts)],
+  ['option bars', fmt(M.n_option_bars)],
+  ['fetched', M.fetched_at],
+  ['synthetic', M.synthetic ? 'yes' : 'no — a real LSEG pull'],
+].map(([k, v]) => `<tr><td style="color:#6E6A63">${k}</td><td>${v}</td></tr>`).join('');
+
+document.querySelector('#chain tbody').innerHTML = M.chain.map(c => {
+  const r = c.requested ? Math.round(c.resolved / c.requested * 100) : 0;
+  return `<tr><td>${c.expiry}</td><td class="r">${c.requested}</td>` +
+         `<td class="r">${c.resolved}</td><td class="r" style="color:${
+           r === 100 ? '#2C7A2C' : '#6E6A63'}">${r}%</td></tr>`;
+}).join('');
+
+document.getElementById('foot').textContent =
+  `cached ${M.fetched_at} · ${fmt(M.n_contracts)} contracts · ${fmt(M.n_option_bars)} option bars`;
+
+/* The one thing this page does at runtime: ask whether a local fetch server is
+   listening. On github.io nothing is, and it must say so rather than pretend. */
+const box = document.getElementById('state');
+function set(kind, ic, title, body) {
+  box.className = 'state ' + kind;
+  box.innerHTML = `<div class="ic">${ic}</div><div><h3>${title}</h3><p>${body}</p></div>`;
+}
+const onPages = location.protocol === 'https:' || location.hostname.endsWith('github.io');
+
+(async function probe() {
+  if (onPages) {
+    set('off', '×', 'Data connection required',
+      'This is the published build on GitHub Pages. There is no data server behind it ' +
+      'and no LSEG entitlement in the browser, so nothing here can be refreshed — every ' +
+      'number on the site comes from the cached pull below. To fetch, clone the repo and ' +
+      'run <code>python covered_call/local_server.py</code> with LSEG Workspace open.');
+    return;
+  }
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 1500);
+    const res = await fetch('http://127.0.0.1:8765/api/status', { signal: ctl.signal });
+    clearTimeout(t);
+    const j = await res.json();
+    if (j.lseg) {
+      set('on', '✓', 'Data connection live',
+        `LSEG Workspace is reachable from this machine (${j.session}). ` +
+        '<code>python -m covered_call.fetch</code> will re-pull the tape.');
+    } else {
+      set('off', '×', 'Data connection required',
+        'The local server is running, but LSEG Workspace is not reachable — ' +
+        `<code>${j.detail || 'no session'}</code>. Start Workspace, sign in, and reload.`);
+    }
+  } catch (e) {
+    set('off', '×', 'Data connection required',
+      'No fetch server on <code>127.0.0.1:8765</code>. Run ' +
+      '<code>python covered_call/local_server.py</code> to enable a re-pull.');
+  }
+})();
+</script>
+</body>
+</html>
