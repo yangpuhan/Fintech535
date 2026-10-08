@@ -11,9 +11,67 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| 1.2 | [`covered_call/`](covered_call/) | **[/](https://yangpuhan.github.io/Fintech535/)** | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
+| 1.3 | [`pmcc/`](pmcc/) | **[/](https://yangpuhan.github.io/Fintech535/)** | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
+| 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
 | 1.1 | [`options_surface_lab/`](options_surface_lab/) | [/1.1/](https://yangpuhan.github.io/Fintech535/1.1/) | Expired UUUU option contracts. Listed options are a sparse cloud, not a filled sheet — and the closing mid is not a price anyone paid. |
 |  | — | [/data.html](https://yangpuhan.github.io/Fintech535/data.html) | Provenance, chain resolution, and the live/no-live connection state. |
+
+---
+
+## 1.3 — Poor Man's Covered Call
+
+Long one deep in-the-money January LEAPS call instead of 100 shares, short
+one monthly call against it, every session from 3 Jan 2022 to 7 Oct 2026.
+The covered-call benchmark writes **exactly the same calls** on the same days
+at the same fills, so every dollar between the two books is the long leg.
+
+```
+pmcc/
+  fetch.py    the LSEG pull  ->  data.pkl                   (run once, by hand)
+  data.pkl    1,817 AAPL calls (monthlies + Jan LEAPS), daily; stock, T-bill,
+              dividends, earnings dates
+  greeks.py   Black-Scholes implied vol and delta from the closing mid
+  book.py     the rules -> blotter, four ledgers, stats, look-ahead test
+  build.py    -> docs/pmcc.js                               (what Pages serves)
+```
+
+Daily, not hourly: LSEG's hourly option history only reaches back a year, and
+a strategy with a one-year long leg needs several. The cost is that every
+quote is a close, so the book **decides on the t-1 close and fills on the t
+close**. `book.lookahead_test` proves it: truncate every price series at a
+date, re-run from scratch, and the blotter up to that date is identical.
+
+### The rule
+
+| | |
+|---|---|
+| **Long** | nearest January expiry with >= 300 days left, strike with delta closest to 0.80; roll at <= 120 days |
+| **Short** | first monthly with >= 21 days left, delta closest to 0.30, subject to the gap rule; hold to expiry |
+| **Gap rule** | K_short - K_long >= mid_long - mid_short, so a gap through the short strike can never lose money |
+| **Expiry** | in the money -> settled at intrinsic; early exercise assumed on the eve of an ex-date when time value < dividend |
+| **Fills** | closing mid; results also shown paying the half-spread on every option fill |
+| **Delta** | computed, not LSEG's DELTA field, which is blank on 426 tradeable quotes in 2022 |
+
+### What it found
+
+| per unit / same $23,000 account | PMCC | covered call | stock |
+|---|---|---|---|
+| capital required | **$8,001** | $22,810 | $18,201 |
+| P&L at mid | +$5,089 | +$10,915 | +$15,934 |
+| return on capital, per year | 10.89% | 8.56% | 14.12% |
+| same account CAGR (idle cash in T-bills) | **7.07%** | **9.17%** | 12.34% |
+| max drawdown, same account | -19.5% | -27.5% | -27.1% |
+| Sharpe | 0.26 | 0.34 | 0.45 |
+
+The PMCC uses 35% of the capital and is, on the same money, a smaller covered
+call rather than a cheaper one. The capital it frees is not free: over the
+five completed LEAPS the financing charge inside the option price used up
+while held was $2,758, and the T-bill interest on the freed cash $2,781.
+Two PMCCs in the same account (as many as it funds) returned 9.68% a year with
+31% volatility and a -40% drawdown. The 57 short calls lost $5,019 net in both
+books while AAPL rose 85%. The headline settings are the textbook defaults and
+turn out to be the weakest PMCC of a 3x3 delta grid; the PMCC trails the
+covered call in every cell.
 
 ---
 
@@ -108,7 +166,8 @@ three times as many contracts as it needed.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python -m covered_call.build          # data.pkl  → docs/book.js
+python -m pmcc.build                  # data.pkl  → docs/pmcc.js
+python -m covered_call.build          # data.pkl  → docs/1.2/book.js
 python -m options_surface_lab.build   # data.pkl  → docs/1.1/
 python covered_call/local_server.py   # http://127.0.0.1:8765/
 ```
@@ -119,6 +178,7 @@ To re-pull from LSEG — needs Workspace running and an app key in
 `lseg-data.config.json`, which is gitignored:
 
 ```bash
+python -m pmcc.fetch
 python -m covered_call.fetch
 python -m options_surface_lab.fetch
 ```
@@ -145,7 +205,12 @@ quiet colour, a real trade is rare so it got the loud one. 1.2 keeps the same
 logic — the requirement lines are the thing that can stop you trading, so they
 are the ones in vermilion.
 
-The three chart series were checked rather than chosen by eye: all-pairs
+1.3 compares four books, and encodes them by structure rather than by four
+unrelated hues: colour is what is held long (blue shares, vermilion LEAPS),
+dash is whether calls are written against it (solid yes, dotted no). Two hues
+pass the palette validator outright; the dash carries the other half.
+
+The 1.2 chart series were checked rather than chosen by eye: all-pairs
 lightness, chroma, normal-vision separation and contrast against the plot
 surface pass. Blue↔green sits in the colour-vision-deficiency warn band, so
 every series also carries a dash pattern, a direct end-label, and a row in the

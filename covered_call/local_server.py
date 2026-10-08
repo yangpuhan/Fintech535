@@ -1,5 +1,6 @@
 """
-Serve docs/ locally and answer one question the published site cannot.
+Serve docs/ (the whole site, every assignment) locally and answer one
+question the published site cannot.
 
     python covered_call/local_server.py
     # http://127.0.0.1:8765/data.html
@@ -23,8 +24,10 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 HOST, PORT = "127.0.0.1", 8765
 
 # The desktop API the lseg-data library talks to. Workspace has to be running
-# and signed in for either of these to accept a connection.
-WORKSPACE_PORTS = (9000, 9060)
+# and signed in for any of these to accept a connection. It takes the first
+# free port from 9000 up — on 8 Oct 2026 it came up on 9003, and a check of
+# 9000 alone reported it shut while the pull was working.
+WORKSPACE_PORTS = (*range(9000, 9011), 9060)
 
 
 def workspace_status() -> dict:
@@ -41,7 +44,7 @@ def workspace_status() -> dict:
             if s.connect_ex((HOST, port)) == 0:
                 return {"lseg": True, "session": f"desktop.workspace :{port}"}
     return {"lseg": False, "session": None,
-            "detail": f"nothing listening on {' or '.join(map(str, WORKSPACE_PORTS))}"}
+            "detail": "nothing listening on 9000-9010 or 9060"}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -64,8 +67,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main() -> None:
-    if not (DOCS / "book.js").exists():
-        raise SystemExit("docs/book.js is missing — run `python -m covered_call.build` first")
+    if not (DOCS / "pmcc.js").exists():
+        raise SystemExit("docs/pmcc.js is missing — run `python -m pmcc.build` first")
     status = workspace_status()
     print(f"serving {DOCS}")
     print(f"  http://{HOST}:{PORT}/            the graded page")

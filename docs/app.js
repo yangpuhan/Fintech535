@@ -1,58 +1,41 @@
-/* Draws the page from window.BOOK. No calculation lives here — every number
-   on screen was computed in covered_call/book.py and baked into book.js.
-   The one exception is the y = a + bx line in section 06, which is evaluated
-   from the slope and intercept the fit already reported. */
+/* Draws the page from window.PMCC. Every number was computed in pmcc/book.py
+   and pmcc/build.py; the only arithmetic here is formatting, ratios of two
+   baked numbers, and scaling the PMCC row by the contract count for the
+   levered line of the performance table. */
 'use strict';
 
-const B = window.BOOK;
+const P = window.PMCC;
+const S = P.summary, U = P.unit, A = P.same, M = P.meta, K = P.checks;
 const CSS = getComputedStyle(document.documentElement);
 const C = n => CSS.getPropertyValue(n).trim();
 
 const INK = C('--ink'), MUTED = C('--muted'), FAINT = C('--faint');
-const RULE = C('--rule'), CARD = C('--card'), PAPER = C('--paper');
-const NAVC = C('--s-nav'), REQ = C('--s-req'), AVAIL = C('--s-avail'), QUOTE = C('--s-quote');
+const RULE = C('--rule'), CARD = C('--card');
+const STOCK = C('--s-stock'), LEAPS = C('--s-leaps'), HIT = C('--s-hit'), KEPT = C('--s-kept');
 const SERIF = "'Source Serif 4', Georgia, serif";
 const MONO = "'Source Code Pro', Menlo, monospace";
 
 /* ── formatting ─────────────────────────────────────────────────────── */
-const money = (v, d = 2) => v === null || v === undefined ? '—' :
-  (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US',
-    { minimumFractionDigits: d, maximumFractionDigits: d });
-const signed = (v, d = 2) => v === null || v === undefined ? '—' :
-  (v < 0 ? '−$' : '+$') + Math.abs(v).toLocaleString('en-US',
-    { minimumFractionDigits: d, maximumFractionDigits: d });
-const num = (v, d = 2) => v === null || v === undefined ? '—' :
-  v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt = (v, d) => Math.abs(v).toLocaleString('en-US',
+  { minimumFractionDigits: d, maximumFractionDigits: d });
+const money = (v, d = 2) => v === null || v === undefined ? '—' : (v < 0 ? '−$' : '$') + fmt(v, d);
+const signed = (v, d = 2) => v === null || v === undefined ? '—' : (v < 0 ? '−$' : '+$') + fmt(v, d);
+const num = (v, d = 2) => v === null || v === undefined ? '—' : (v < 0 ? '−' : '') + fmt(v, d);
 const pct = (v, d = 2) => v === null || v === undefined ? '—' :
   (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d) + '%';
-const cls = v => v < 0 ? ' class="neg"' : v > 0 ? ' class="pos"' : '';
-const hhmm = t => t.slice(0, 16);
-const dmy = t => t.slice(0, 10);
+const cls = v => v < 0 ? ' class="neg"' : '';
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const setHTML = (id, v) => { const e = document.getElementById(id); if (e) e.innerHTML = v; };
+const contract = (k, e) => `${num(k, k % 1 ? 2 : 0)}C ${e}`;
+/* RIC -> "140C 2023-01-20", from the blotter, for the ledger's position columns */
+const NAMES = Object.fromEntries(P.trades.map(t => [t.ric, contract(t.strike, t.expiry)]));
+const short = ric => ric ? NAMES[ric] || ric : '—';
 
 /* ── shared Plotly furniture ────────────────────────────────────────── */
 const CONFIG = { responsive: true, displaylogo: false, displayModeBar: 'hover',
                  modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'] };
+const WEEKENDS = [{ bounds: ['sat', 'mon'] }];
 
-/* Hide the hours and weekends the market is shut, so an hourly series reads
-   as one continuous line instead of 49 islands. */
-const TRADING_HOURS = [
-  { pattern: 'hour', bounds: [20, 13] },
-  { pattern: 'day of week', bounds: ['sat', 'mon'] },
-];
-
-function layout(o = {}) {
-  return Object.assign({
-    paper_bgcolor: CARD, plot_bgcolor: CARD,
-    font: { family: SERIF, size: 13, color: INK },
-    margin: { l: 66, r: 22, t: 34, b: 42 },
-    hovermode: 'x unified',
-    hoverlabel: { bgcolor: CARD, bordercolor: RULE, font: { family: MONO, size: 12, color: INK } },
-    legend: { orientation: 'h', y: 1.1, x: 0, font: { family: MONO, size: 11 },
-              bgcolor: 'rgba(0,0,0,0)' },
-    xaxis: axis(), yaxis: axis(),
-  }, o);
-}
 function axis(o = {}) {
   return Object.assign({
     gridcolor: RULE, linecolor: RULE, zeroline: false,
@@ -60,432 +43,460 @@ function axis(o = {}) {
     title: { font: { family: SERIF, size: 12, color: INK } },
   }, o);
 }
+const ytitle = t => ({ text: t, font: { family: SERIF, size: 12, color: INK } });
+function layout(o = {}) {
+  return Object.assign({
+    paper_bgcolor: CARD, plot_bgcolor: CARD,
+    font: { family: SERIF, size: 13, color: INK },
+    margin: { l: 70, r: 24, t: 34, b: 42 },
+    hovermode: 'x unified',
+    hoverlabel: { bgcolor: CARD, bordercolor: RULE, font: { family: MONO, size: 12, color: INK } },
+    legend: { orientation: 'h', y: 1.1, x: 0, font: { family: MONO, size: 11, color: INK },
+              bgcolor: 'rgba(0,0,0,0)' },
+    xaxis: axis(), yaxis: axis(),
+  }, o);
+}
 
-/* ══ masthead, cards, write-up numbers ═══════════════════════════════ */
-const S = B.stats, M = B.meta;
+const BOOKS = [
+  { k: 'stock', name: 'Stock', color: STOCK, dash: 'dot' },
+  { k: 'cc', name: 'Covered call', color: STOCK, dash: 'solid' },
+  { k: 'leaps', name: 'LEAPS only', color: LEAPS, dash: 'dot' },
+  { k: 'pmcc', name: 'PMCC', color: LEAPS, dash: 'solid' },
+  { k: 'pmcc_lev', name: `PMCC ×${M.n_lev}`, color: LEAPS, dash: 'dashdot', width: 1.3 },
+];
 
-document.getElementById('prov').innerHTML =
-  `${M.ticker} · ${M.stock_ric} · ${M.interval} bars · ${M.n_bars} bars over ` +
-  `${M.n_sessions} sessions, ${dmy(M.first_bar)} → ${dmy(M.last_bar)}<br>` +
-  `LSEG pull cached ${M.fetched_at} · ${M.n_contracts} expired call contracts · ` +
-  `${M.n_option_bars.toLocaleString()} option bars · orders stamped at ` +
-  `${String(M.order_hour_utc).padStart(2, '0')}:00 UTC`;
+/* ══ masthead ═══════════════════════════════════════════════════════ */
+setHTML('prov',
+  `${M.ticker} · ${M.stock_ric} · daily closes · ${M.sessions} sessions, ${M.first_fill} → ${M.end}<br>` +
+  `LSEG pull ${M.fetched_at} · ${M.n_contracts.toLocaleString()} option contracts · ` +
+  `${M.n_option_rows.toLocaleString()} daily quotes · rate ${M.rate_ric}`);
+
+const spreadShare = U.pmcc.spread_cost / U.pmcc.pnl * 100;
+setHTML('answer', [
+  `<b>It does use less capital.</b> ${money(U.pmcc.capital, 0)} per unit against
+   ${money(U.cc.capital, 0)} for a covered call writing the identical calls —
+   ${num(S.capital_ratio_pct, 0)}%.`,
+  `<b>Its return on that capital is higher, because it is leverage.</b>
+   ${num(U.pmcc.roc_ann_pct)}% a year on capital deployed against ${num(U.cc.roc_ann_pct)}%
+   for the covered call. Its worst peak-to-trough loss, into the April 2025 low, was
+   ${num(Math.abs(U.pmcc.max_dd_pct_cap), 0)}% of that capital; the covered call's was
+   ${num(Math.abs(U.cc.max_dd_pct_cap), 0)}%.`,
+  `<b>On the same money it is a smaller covered call, not a cheaper one.</b> In the same
+   ${money(M.account, 0)} account, spare cash in T-bills, one PMCC returned
+   ${num(A.pmcc.cagr_pct)}% a year against ${num(A.cc.cagr_pct)}%, with less volatility
+   (${num(A.pmcc.vol_pct, 1)}% vs ${num(A.cc.vol_pct, 1)}%) and a shallower drawdown
+   (${pct(A.pmcc.max_dd_pct, 1)} vs ${pct(A.cc.max_dd_pct, 1)}) — it held the equivalent of
+   ${num(S.mean_pmcc_delta, 0)} shares on average, against ${num(S.mean_cc_delta, 0)}.
+   ${['None', 'One', 'Two', 'Three', 'Four'][M.n_lev] || M.n_lev} PMCCs, as many as the account can fund, returned ${num(A.pmcc_lev.cagr_pct)}% with
+   ${num(A.pmcc_lev.vol_pct, 1)}% volatility and a ${pct(A.pmcc_lev.max_dd_pct, 1)} drawdown.
+   Risk-adjusted it trailed either way: Sharpe ${num(A.pmcc.sharpe)} and ${num(A.pmcc_lev.sharpe)}
+   against ${num(A.cc.sharpe)}.`,
+  `<b>The capital it saves is not free.</b> A LEAPS price includes interest on its strike
+   until expiry. Over the five completed LEAPS, the part of that charge used up while
+   held came to ${money(S.carry_held, 0)}; T-bill interest on the cash the PMCC freed came
+   to ${money(S.tbill_freed, 0)}. One pays for the other.`,
+  `<b>Writing calls lost money in this window, in both books.</b> AAPL rose
+   ${num(S.stock_move_pct, 0)}%. The ${S.n_cycles} short calls collected ${money(S.premium, 0)}
+   and paid back ${money(S.intrinsic, 0)} in intrinsic value, net ${signed(S.overlay_pnl, 0)}.
+   Both call-writing books trailed simply holding their long leg.`,
+].map(t => `<li>${t}</li>`).join(''));
+
+setHTML('rec',
+  `<b>Recommendation.</b> Use the PMCC when capital is the binding constraint and a covered
+   call with about ${num(S.mean_pmcc_delta / S.mean_cc_delta * 100, 0)}% of the share exposure
+   is what you want. Don't use it to earn more per unit of risk: here it did not, and
+   with T-bills at 4–5% the LEAPS charges back what the freed cash earns. Budget for costs:
+   two option legs and a wide LEAPS quote cost ${money(U.pmcc.spread_cost, 0)} in half-spreads,
+   ${num(spreadShare, 0)}% of its P&amp;L, against ${money(U.cc.spread_cost, 0)} for the covered call.`);
 
 const CARDS = [
-  ['final NAV', money(S.final_nav), `from ${money(S.opening_cash, 0)} opening cash`, INK, true],
-  ['strategy P&amp;L', signed(S.pnl), `${pct(S.ret_pct)} over ${S.weeks_traded} weeks`,
-    S.pnl < 0 ? REQ : AVAIL, true],
-  ['vs. buy &amp; hold', signed(S.vs_bh), `same bar, same money: ${pct(S.bh_ret_pct)}`,
-    S.vs_bh < 0 ? REQ : AVAIL, true],
-  ['assigned', `${S.n_assigned} / ${S.weeks_traded}`, `${S.n_expired} expired worthless`, REQ, false],
-  ['premium collected', money(S.premium_total, 0), `${money(S.premium_mean, 0)} a week`, QUOTE, false],
-  ['handed back', money(S.intrinsic_paid, 0), 'intrinsic value on assignment', REQ, false],
-  ['max drawdown', pct(S.max_drawdown), 'peak-to-trough on NAV', INK, false],
-  ['min available funds', money(S.min_available), `${dmy(S.min_available_ts)} · never negative`,
-    AVAIL, false],
+  ['capital per unit', money(U.pmcc.capital, 0), `covered call ${money(U.cc.capital, 0)}`],
+  ['P&amp;L per unit', signed(U.pmcc.pnl, 0), `covered call ${signed(U.cc.pnl, 0)} · at mid`],
+  ['return on capital', `${num(U.pmcc.roc_ann_pct)}%/yr`, `covered call ${num(U.cc.roc_ann_pct)}%/yr`],
+  ['same-account CAGR', `${num(A.pmcc.cagr_pct)}%`,
+    `covered call ${num(A.cc.cagr_pct)}% · stock ${num(A.stock.cagr_pct)}%`],
+  ['max drawdown, same account', pct(A.pmcc.max_dd_pct), `covered call ${pct(A.cc.max_dd_pct)}`],
+  ['short calls, net', signed(S.overlay_pnl, 0), `${S.n_cycles} calls, identical in both books`],
 ];
-document.getElementById('cards').innerHTML = CARDS.map(([lab, val, hint, col, hero]) =>
-  `<div class="card${hero ? ' hero' : ''}"><div class="lab">${lab}</div>` +
-  `<div class="val" style="color:${col}">${val}</div><div class="hint">${hint}</div></div>`
-).join('');
+setHTML('cards', CARDS.map(([lab, val, hint]) =>
+  `<div class="card"><div class="lab">${lab}</div><div class="val">${val}</div>` +
+  `<div class="hint">${hint}</div></div>`).join(''));
 
-document.getElementById('skipnote').innerHTML = B.skipped.length === 0
-  ? `<b>No week was skipped.</b> All ${S.weeks_total} expiry weeks in the window had a
-     two-sided quote on an out-of-the-money strike at the order bar, so the
-     no-bid/no-ask branch never fired. On a thinner name it would be the rule that
-     decides most of the outcome — in Assignment 1.1, 63% of the listed UUUU grid never
-     traded at all.`
-  : `<b>${B.skipped.length} week(s) skipped.</b> ` + B.skipped.map(s =>
-      `${s.entry}: ${s.why} (spot ${num(s.spot)})`).join(' · ');
+setHTML('r-delta', num(K.delta.median_abs, 4));
+setHTML('r-acct', money(M.account, 0));
 
-const setText = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-setText('cap-otm', `${num(S.mean_otm_pct)}%`);
-setText('cap-otm-max', `${num(S.max_otm_pct)}%`);
-setText('cap-lmv', money(S.max_initial * 2, 0));
-setText('cap-outside', `${(100 - B.fit.pct_inside).toFixed(1)}%`);
-setText('a-otm', `${num(S.mean_otm_pct)}%`);
-setText('a-prem', money(S.premium_total, 0));
-setText('a-intr', money(S.intrinsic_paid, 0));
-setText('a-callpnl', money(Math.abs(S.call_pnl), 0));
-setText('a-stockpnl', money(S.stock_pnl, 0));
-setText('a-ret', pct(S.ret_pct));
-setText('a-lmv', money(S.max_initial * 2, 0));
-setText('a-open', money(S.opening_cash, 0));
-setText('a-lev', `${(S.max_initial * 2 / S.opening_cash).toFixed(2)}×`);
-setText('a-vsbh', money(Math.abs(S.vs_bh)));
-setText('a-debit', money(S.debit_mean, 0));
-setText('a-days', `${S.debit_days} days`);
-setText('a-rate', `${num(S.debit_rate_pct, 1)}%`);
-setText('a-int', money(S.debit_interest, 0));
-setText('a-intpct', `${(S.debit_interest / S.pnl * 100).toFixed(0)}%`);
-setText('foot', `${M.ticker} covered call · ${S.weeks_traded} weekly expiries · ` +
-  `${S.n_blotter} booked trades · ${S.n_bars} ledger bars · ` +
-  `week attribution reconciles to NAV within ${money(Math.abs(S.attribution_gap))}`);
-
-document.getElementById('a-headline').innerHTML =
-  `The book ended at <b>${money(S.final_nav)}</b> on <b>${money(S.opening_cash, 0)}</b>
-   of opening cash — <b>${signed(S.pnl)}</b>, ${pct(S.ret_pct)} over ten weeks, with a
-   ${pct(S.max_drawdown)} drawdown along the way. Buying the same 100 shares on the same
-   bar and doing nothing else returned <b>${signed(S.bh_pnl)}</b>. Writing a call against
-   them every week, collecting ${money(S.premium_total, 0)} of premium for the trouble,
-   <b>cost ${money(Math.abs(S.vs_bh))}</b>. That is not a bug in the implementation; it is
-   what the structure does to a stock that rises ${pct((S.bh_last / S.bh_first - 1) * 100, 1)}
-   in ten weeks.`;
-
-/* ══ 02 · stock and strikes ══════════════════════════════════════════ */
-(function strikes() {
-  const traces = [{
-    x: B.stock.ts, y: B.stock.px, type: 'scatter', mode: 'lines',
-    name: `${M.ticker} print`, line: { color: INK, width: 1.6 },
-    hovertemplate: '%{y:$,.2f}<extra>AAPL</extra>',
-  }];
-  let seenA = false, seenE = false;
-  B.weeks.forEach(w => {
-    const end = B.stock.ts.filter(t => t.slice(0, 10) === w.expiry).pop() || w.entry_ts;
-    const on = w.outcome === 'ASSIGNED';
-    const col = on ? REQ : AVAIL;
-    const first = on ? !seenA : !seenE;
-    if (on) seenA = true; else seenE = true;
-    traces.push({
-      x: [w.entry_ts, end], y: [w.strike, w.strike],
-      type: 'scatter', mode: 'lines',
-      name: on ? 'strike · assigned' : 'strike · expired',
-      legendgroup: w.outcome, showlegend: first,
-      line: { color: col, width: 2.5, dash: on ? 'solid' : 'dot' },
-      hovertemplate: `short ${num(w.strike)} call<br>` +
-        `premium ${money(w.premium, 2)}<br>settle ${money(w.settle)}` +
-        `<extra>${w.outcome.toLowerCase()}</extra>`,
-    });
+/* ══ 01 · payoff ════════════════════════════════════════════════════ */
+(function payoff() {
+  const Y = P.payoff;
+  const line = (y, name, color) => ({
+    x: Y.S, y, type: 'scatter', mode: 'lines', name,
+    line: { color, width: 2 }, hovertemplate: '%{y:$,.0f}<extra>' + name + '</extra>',
   });
-  traces.push({
-    x: B.weeks.map(w => w.entry_ts), y: B.weeks.map(w => w.spot),
-    type: 'scatter', mode: 'markers', name: 'order bar',
-    marker: { color: NAVC, size: 9, symbol: 'circle',
-              line: { color: CARD, width: 2 } },
-    hovertemplate: 'entry · spot %{y:$,.2f}<extra></extra>',
+  const vline = (x, text, side) => ({
+    shape: { type: 'line', x0: x, x1: x, y0: 0, y1: 1, yref: 'paper',
+             line: { color: FAINT, width: 1, dash: 'dot' } },
+    ann: { x, y: 1, yref: 'paper', yanchor: 'bottom', xanchor: side, text, showarrow: false,
+           xshift: side === 'left' ? 3 : -3, font: { family: MONO, size: 10, color: MUTED } },
   });
-  /* The one week the rule sold into an event it could not see. */
-  const ev = M.earnings, evx = '2026-07-30 19:00:00';
-  Plotly.newPlot('plot-strikes', traces, layout({
-    hovermode: 'closest',
-    shapes: ev ? [{ type: 'line', x0: evx, x1: evx, y0: 0, y1: 1, yref: 'paper',
-                    line: { color: MUTED, width: 1.2, dash: 'dot' } }] : [],
-    annotations: ev ? [{ x: evx, y: 1, yref: 'paper', yanchor: 'bottom',
-                         text: 'earnings, after the close', showarrow: false,
-                         xanchor: 'right', xshift: -4,
-                         font: { family: MONO, size: 10, color: MUTED } }] : [],
-    xaxis: axis({ rangebreaks: TRADING_HOURS }),
-    yaxis: axis({ title: { text: 'price ($)', font: { family: SERIF, size: 12, color: INK } },
-                  tickprefix: '$' }),
+  /* the two prices sit $15 apart: anchor the labels away from each other */
+  const v = [vline(Y.spot, `entry ${money(Y.spot)}`, 'left'),
+             vline(Y.settle, `expiry ${money(Y.settle)}`, 'right')];
+  const n = Y.S.length - 1;
+  Plotly.newPlot('plot-payoff', [
+    line(Y.cc, 'Covered call', STOCK),
+    line(Y.pmcc, 'PMCC', LEAPS),
+  ], layout({
+    margin: { l: 70, r: 92, t: 40, b: 46 },
+    /* bottom-right is the one empty corner of a capped payoff */
+    legend: { x: 0.98, y: 0.04, xanchor: 'right', yanchor: 'bottom', bgcolor: CARD,
+              font: { family: MONO, size: 11, color: INK } },
+    shapes: v.map(o => o.shape).concat([{ type: 'line', x0: Y.S[0], x1: Y.S[n], y0: 0, y1: 0,
+      line: { color: INK, width: 1 } }]),
+    annotations: v.map(o => o.ann).concat([
+      { x: Y.S[n], y: Y.cc[n], text: 'covered call', xanchor: 'left', xshift: 6, showarrow: false,
+        font: { family: MONO, size: 10.5, color: INK } },
+      { x: Y.S[n], y: Y.pmcc[n], text: 'PMCC', xanchor: 'left', xshift: 6, showarrow: false,
+        font: { family: MONO, size: 10.5, color: INK } }]),
+    xaxis: axis({ title: ytitle(`AAPL at the ${Y.expiry} expiry`), tickprefix: '$',
+                  range: [Y.S[0], Y.S[n]] }),
+    yaxis: axis({ title: ytitle('P&L per unit ($)'), tickformat: '$,.0f' }),
   }), CONFIG);
+
+  const lossP = Y.pmcc[0] / Y.debit * 100, lossC = Y.cc[0] / Y.cc_cost * 100;
+  setHTML('payoff-facts', [
+    `<b>Cost.</b> The PMCC paid ${money(Y.debit, 0)}: the ${num(Y.long_strike, 0)} call
+     expiring ${Y.long_expiry} at ${money(Y.long_price)}, less ${money(Y.short_price)} for the
+     ${num(Y.short_strike, 0)} call. The covered call paid ${money(Y.cc_cost, 0)} for the shares,
+     less the same premium.`,
+    `<b>Upside.</b> Both are capped at the ${num(Y.short_strike, 0)} strike. Above it the PMCC is
+     worth about the width of the spread, ${money(Y.short_strike - Y.long_strike, 0)} a share,
+     plus whatever time value the LEAPS still has.`,
+    `<b>Downside.</b> The PMCC can lose at most its debit; the covered call can lose
+     ${money(Y.cc_cost, 0)}. Per dollar invested the PMCC falls faster: at the left edge of the
+     chart (AAPL ${pct((Y.S[0] / Y.spot - 1) * 100, 0)}) it has lost ${num(Math.abs(lossP), 0)}% of
+     what it paid, the covered call ${num(Math.abs(lossC), 0)}%.`,
+    `<b>The PMCC's own risk is a rally.</b> If the spread's width were less than its cost,
+     a gap through the short strike would lose money. The gap rule in 02 forbids that trade.`,
+  ].map(t => `<li>${t}</li>`).join(''));
+  setHTML('payoff-cap',
+    `The LEAPS is revalued at the short call's expiry with Black–Scholes at the implied
+     volatility it was bought at (${num(Y.iv * 100, 1)}%), holding the rate and dividend yield
+     fixed — the one model-made curve on the page. Everything else is booked off quotes.`);
 })();
 
-/* ══ 03 · NAV and Reg T ═════════════════════════════════════════════ */
+/* ══ 03 · NAV ═══════════════════════════════════════════════════════ */
 (function nav() {
-  const L = B.ledger, x = L.map(r => r.ts);
-  const line = (key, name, color, dash, width) => ({
-    x, y: L.map(r => r[key]), type: 'scatter', mode: 'lines', name,
-    line: { color, width: width || 2, dash, shape: 'hv' },
-    hovertemplate: '%{y:$,.0f}<extra>' + name + '</extra>',
-  });
-  const traces = [
-    line('nav', 'NAV', NAVC, 'solid', 2.2),
-    line('initial', 'initial requirement (50%)', REQ, 'dash'),
-    line('maint', 'maintenance (25%)', REQ, 'dot'),
-    line('available', 'available funds', AVAIL, 'solid'),
-  ];
-  // event ticks along the bottom, so the chart and the blotter line up
-  traces.push({
-    x: B.blotter.map(b => b.ts),
-    y: B.blotter.map(() => 0),
-    type: 'scatter', mode: 'markers', name: 'blotter event',
-    marker: { symbol: 'line-ns-open', size: 11, color: MUTED,
-              line: { width: 1.4, color: MUTED } },
-    hoverinfo: 'skip', showlegend: true,
-  });
-
-  /* Direct-label each line at the last bar the book was still long. On the
-     very last bar the position is flat, so initial and maintenance are both
-     zero and available equals NAV — four labels stacked on two points. */
-  let li = L.length - 1;
-  while (li > 0 && L[li].shares === 0) li--;
-  const ann = [['nav', 'NAV', NAVC], ['initial', 'initial', REQ],
-               ['maint', 'maint', REQ], ['available', 'available', AVAIL]]
-    .map(([k, text, color]) => ({
-      x: x[li], y: L[li][k], xref: 'x', yref: 'y', text,
-      font: { family: MONO, size: 10.5, color },
-      xanchor: 'left', xshift: 8, showarrow: false,
-    }));
-
+  const Cv = P.curves;
+  const traces = BOOKS.map(b => ({
+    x: Cv.date, y: Cv[b.k], type: 'scatter', mode: 'lines', name: b.name,
+    line: { color: b.color, width: b.width || 2, dash: b.dash },
+    hovertemplate: '%{y:$,.0f}<extra>' + b.name + '</extra>',
+  }));
+  const last = Cv.date.length - 1;
+  const ann = BOOKS.filter(b => b.k !== 'pmcc_lev').map(b => ({
+    x: Cv.date[last], y: Cv[b.k][last], text: b.name, xanchor: 'left', xshift: 6,
+    showarrow: false, font: { family: MONO, size: 10.5, color: INK },
+  }));
   Plotly.newPlot('plot-nav', traces, layout({
-    margin: { l: 70, r: 82, t: 34, b: 42 },
+    margin: { l: 70, r: 104, t: 40, b: 42 },
     annotations: ann,
-    xaxis: axis({ rangebreaks: TRADING_HOURS, showspikes: true,
-                  spikecolor: FAINT, spikethickness: 1, spikedash: 'dot',
-                  spikemode: 'across' }),
-    yaxis: axis({ title: { text: 'dollars', font: { family: SERIF, size: 12, color: INK } },
-                  tickprefix: '$', rangemode: 'tozero' }),
+    shapes: [{ type: 'line', x0: Cv.date[0], x1: Cv.date[last], y0: M.account, y1: M.account,
+               line: { color: FAINT, width: 1 } }],
+    xaxis: axis({ rangebreaks: WEEKENDS, range: [Cv.date[0], Cv.date[last]] }),
+    yaxis: axis({ title: ytitle(`account value, opened with ${money(M.account, 0)}`),
+                  tickformat: '$,.0f' }),
   }), CONFIG);
 })();
 
-/* worked bar — the bar where Reg T bound hardest */
-(function worked() {
-  const r = B.ledger.find(x => x.available === S.min_available) || B.ledger[B.ledger.length - 1];
-  const row = (k, v, strong) => `<span style="color:${MUTED}">${k}</span> ` +
-    `<span style="float:right${strong ? ';font-weight:700' : ''}">${v}</span><br>`;
-  document.getElementById('worked').innerHTML =
-    `<div style="color:${MUTED};font-size:11px;letter-spacing:.06em;margin-bottom:8px">` +
-    `${hhmm(r.ts)} UTC · TIGHTEST BAR OF THE RUN</div>` +
-    row('shares', `${r.shares} @ ${money(r.stock_mark)}`) +
-    row('short call', r.call ? `${num(r.strike)} · ${money(r.call_mark, 3)}` : 'none') +
-    row('cash', money(r.cash)) +
-    row('stock MV', money(r.stock_mv)) +
-    row('option MV', money(r.option_mv)) +
-    `<hr style="border:none;border-top:1px solid ${RULE};margin:7px 0">` +
-    row('NAV', money(r.nav), true) +
-    row('initial (50%)', money(r.initial)) +
-    row('maintenance (25%)', money(r.maint)) +
-    `<hr style="border:none;border-top:1px solid ${RULE};margin:7px 0">` +
-    `<span style="color:${MUTED}">available funds</span>` +
-    `<span style="float:right;font-weight:700;color:${AVAIL}">${money(r.available)}</span><br>` +
-    `<span style="color:${MUTED}">excess liquidity</span>` +
-    `<span style="float:right">${money(r.excess)}</span>`;
+(function perfTable() {
+  const n = M.n_lev;
+  const rows = BOOKS.map(b => {
+    const u = b.k === 'pmcc_lev'
+      ? { capital: U.pmcc.capital * n, pnl: U.pmcc.pnl * n, pnl_natural: U.pmcc.pnl_natural * n,
+          roc_ann_pct: U.pmcc.roc_ann_pct }
+      : U[b.k];
+    const a = A[b.k];
+    return `<tr${b.k === 'pmcc' ? ' class="hl"' : ''}>
+      <td class="l"><span class="key${b.dash === 'dot' ? ' dot' : ''}" style="border-color:${b.color}"></span>${b.name}</td>
+      <td>${money(u.capital, 0)}</td><td>${signed(u.pnl, 0)}</td><td>${signed(u.pnl_natural, 0)}</td>
+      <td>${num(u.roc_ann_pct)}%</td>
+      <td>${money(a.final, 0)}</td><td>${num(a.cagr_pct)}%</td><td>${num(a.vol_pct, 1)}%</td>
+      <td>${num(a.sharpe)}</td><td${cls(a.max_dd_pct)}>${pct(a.max_dd_pct, 1)}
+        <span style="color:${FAINT}">${a.max_dd_date.slice(0, 7)}</span></td></tr>`;
+  });
+  document.querySelector('#t-perf tbody').innerHTML = rows.join('');
+  setHTML('perf-cap',
+    `Per unit = 100 shares or one contract of each leg, no interest. Capital required is the
+     deepest the per-unit cash ever went: the covered call needs more than the shares alone
+     because buying back assigned calls is paid in cash. Return on capital is per-unit P&amp;L
+     over that capital, annualised over ${num(S.years, 1)} years. The same-account columns open
+     every book with ${money(M.account, 0)} and pay the T-bill rate on idle cash; Sharpe is the
+     daily excess over T-bills, annualised. "PMCC ×${n}" is ${n} contracts of everything, the most
+     the account can fund.`);
 
-  document.getElementById('marginnote').innerHTML =
-    `<b>Available funds never went negative.</b> The tightest bar left
-     ${money(S.min_available)} of room, so every trade in the blotter was one this
-     account could actually have put on. Running the same book backwards, the smallest
-     opening balance that clears Reg T on every bar is
-     <b>${money(S.min_opening_cash)}</b> — ${money(S.opening_cash, 0)} is the nearest
-     round number above it, which is how the opening cash was chosen rather than picked
-     to flatter the return. The account carries a debit the whole time it is long,
-     peaking at ${money(Math.abs(S.cash_min), 0)}; Reg T permits that (50% of
-     ${money(S.max_initial * 2, 0)} of stock), and this book does not charge itself
-     interest on it. See section 07.`;
+  const years = Object.keys(A.pmcc.years);
+  document.querySelector('#t-years thead').innerHTML =
+    `<tr><th class="l">book</th>${years.map((y, i) =>
+      `<th>${y}${i === years.length - 1 ? ' to ' + M.end.slice(5) : ''}</th>`).join('')}</tr>`;
+  document.querySelector('#t-years tbody').innerHTML = BOOKS.map(b =>
+    `<tr${b.k === 'pmcc' ? ' class="hl"' : ''}><td class="l">
+      <span class="key${b.dash === 'dot' ? ' dot' : ''}" style="border-color:${b.color}"></span>${b.name}</td>
+      ${years.map(y => `<td${cls(A[b.k].years[y])}>${pct(A[b.k].years[y], 1)}</td>`).join('')}</tr>`
+  ).join('');
 })();
 
-/* ══ 04 · blotter and weeks ═════════════════════════════════════════ */
-function renderBlotter(filter) {
-  const rows = B.blotter.filter(b =>
-    filter === 'all' ? true :
-    filter === 'AAPL.O' ? b.instrument === M.stock_ric :
-    filter === 'opt' ? b.instrument !== M.stock_ric :
-    b.side === filter);
-  document.querySelector('#t-blotter tbody').innerHTML = rows.map(b => `<tr>
-    <td class="l">${hhmm(b.ts)}</td>
-    <td class="l">${esc(b.instrument)}</td>
-    <td class="l side side-${b.side}">${b.side}</td>
-    <td>${b.qty}</td>
-    <td>${b.limit === null ? '—' : money(b.limit)}</td>
-    <td>${money(b.fill)}</td>
-    <td${cls(b.cash_delta)}>${b.cash_delta === 0 ? money(0) : signed(b.cash_delta)}</td>
-    <td>${money(b.cash_after)}</td>
-    <td class="l" style="color:${MUTED}">${esc(b.rule)}</td>
-    <td class="note">${esc(b.note)}</td></tr>`).join('');
-  document.getElementById('blotter-count').textContent =
-    `${rows.length} of ${B.blotter.length} booked trades`;
+/* ══ 04 · position ══════════════════════════════════════════════════ */
+(function position() {
+  const Cv = P.curves;
+  const traces = [{
+    x: Cv.date, y: Cv.spot, type: 'scatter', mode: 'lines', name: 'AAPL close',
+    line: { color: INK, width: 1.5 }, hovertemplate: '%{y:$,.2f}<extra>AAPL</extra>',
+  }];
+  P.lots.forEach((l, i) => traces.push({
+    x: [l.opened, l.closed || M.end], y: [l.strike, l.strike], type: 'scatter', mode: 'lines',
+    name: 'LEAPS strike', legendgroup: 'leaps', showlegend: i === 0,
+    line: { color: MUTED, width: 2, dash: 'dash' },
+    hovertemplate: `long ${contract(l.strike, l.expiry)}<br>bought ${money(l.price)}, ` +
+      `delta ${num(l.delta)}<extra></extra>`,
+  }));
+  const seen = {};
+  P.cycles.forEach(c => {
+    const hit = c.outcome === 'ASSIGNED' || c.outcome === 'EARLY';
+    const g = c.outcome === 'OPEN' ? 'open' : hit ? 'hit' : 'kept';
+    const name = { hit: 'short call · assigned', kept: 'short call · expired', open: 'short call · open' }[g];
+    traces.push({
+      x: [c.opened, c.closed || M.end], y: [c.strike, c.strike], type: 'scatter', mode: 'lines',
+      name, legendgroup: g, showlegend: !seen[g],
+      line: { color: g === 'hit' ? HIT : g === 'kept' ? KEPT : FAINT, width: 2.5,
+              dash: g === 'hit' ? 'solid' : 'dot' },
+      hovertemplate: `short ${contract(c.strike, c.expiry)}, delta ${num(c.delta)}<br>` +
+        `premium ${money(c.premium)} · ${c.outcome.toLowerCase()}` +
+        (c.settle ? ` at ${money(c.settle)}` : '') + `<extra></extra>`,
+    });
+    seen[g] = true;
+  });
+  Plotly.newPlot('plot-pos', traces, layout({
+    hovermode: 'closest',
+    xaxis: axis({ rangebreaks: WEEKENDS }),
+    yaxis: axis({ title: ytitle('price / strike ($)'), tickprefix: '$' }),
+  }), CONFIG);
+  setHTML('pos-cap',
+    `${S.n_cycles} short calls, ${S.n_assigned + S.n_early} of them finished in the money. The gap
+     rule lifted ${S.n_bound} of them above their 0.30-delta strike, so the average delta actually
+     sold was ${num(S.mean_delta)}, a median ${num(S.median_otm, 1)}% out of the money. The LEAPS
+     strike resets once a year at the roll. In mid-2022 AAPL fell under it, and the gap rule
+     pushed the short strikes far out, because a call struck below the long's breakeven would
+     lock in a loss if AAPL recovered through it.`);
+
+  Plotly.newPlot('plot-mv', [
+    { x: Cv.date, y: Cv.cc_mv, type: 'scatter', mode: 'lines', name: 'Covered call: shares − short call',
+      line: { color: STOCK, width: 2 }, hovertemplate: '%{y:$,.0f}<extra>covered call</extra>' },
+    { x: Cv.date, y: Cv.pmcc_mv, type: 'scatter', mode: 'lines', name: 'PMCC: LEAPS − short call',
+      line: { color: LEAPS, width: 2 }, hovertemplate: '%{y:$,.0f}<extra>PMCC</extra>' },
+  ], layout({
+    xaxis: axis({ rangebreaks: WEEKENDS }),
+    yaxis: axis({ title: ytitle('position value ($)'), tickformat: '$,.0f', rangemode: 'tozero' }),
+  }), CONFIG);
+  setHTML('mv-cap',
+    `Market value of each position, per unit. The PMCC keeps between a quarter and a third as
+     much at work — which is why its drawdowns are smaller in dollars and larger as a share of
+     what it put up.`);
+})();
+
+/* ══ 05 · attribution ═══════════════════════════════════════════════ */
+(function attribution() {
+  const row = (lab, a, b, c = '') => `<tr${c}><td class="l">${lab}</td>
+    <td${cls(a)}>${a === null ? '—' : signed(a, 0)}</td><td${cls(b)}>${b === null ? '—' : signed(b, 0)}</td></tr>`;
+  document.querySelector('#t-attr tbody').innerHTML = [
+    row('long leg: shares / LEAPS', U.stock.pnl - U.stock.dividends, U.leaps.pnl),
+    row('dividends', U.stock.dividends, null),
+    row('short calls', S.overlay_pnl, S.overlay_pnl),
+    row('P&amp;L at mid', U.cc.pnl, U.pmcc.pnl, ' class="sum"'),
+    row('half-spread on every option fill', -U.cc.spread_cost, -U.pmcc.spread_cost),
+    row('P&amp;L paying the half-spread', U.cc.pnl_natural, U.pmcc.pnl_natural, ' class="sum"'),
+    row('T-bill on idle cash (same account)', A.cc.interest, A.pmcc.interest),
+  ].join('');
+
+  const w = S.worst_cycle;
+  setHTML('short-facts', [
+    `${S.n_cycles} calls: ${S.n_expired} expired worthless, ${S.n_assigned} were in the money at
+     expiry, ${S.n_early} was exercised early ahead of an ex-dividend date, and one is still open.`,
+    `${money(S.premium, 0)} of premium in, ${money(S.intrinsic, 0)} of intrinsic value out.
+     The usual call wins a little; the occasional one loses a lot. The worst, the
+     ${num(w.strike, 0)} call sold on ${w.opened}, lost ${money(Math.abs(w.short_pnl), 0)} when AAPL
+     closed at ${money(w.settle)} on expiry — in a month the LEAPS made ${signed(w.long_pnl, 0)}.`,
+    `${S.earn_n} calls had an earnings report inside them. Together they lost
+     ${money(Math.abs(S.earn_short), 0)} (${money(Math.abs(S.earn_short / S.earn_n), 0)} a call), against
+     ${money(Math.abs(S.noearn_short), 0)} for the other ${S.n_cycles - S.earn_n}
+     (${money(Math.abs(S.noearn_short / (S.n_cycles - S.earn_n)), 0)} a call). No worse — so standing down
+     over earnings, the fix 1.2 proposed after one bad week, would not have helped here.`,
+    `Quoted spreads at the fill: a median ${num(M.spread_pct.short, 1)}% of the mid on the short calls,
+     ${num(M.spread_pct.long, 1)}% on the LEAPS. But a LEAPS costs ~25 times as much, so the
+     LEAPS leg carried ${money(U.leaps.spread_cost, 0)} of the PMCC's ${money(U.pmcc.spread_cost, 0)}
+     in half-spreads, against ${money(U.cc.spread_cost, 0)} for all ${S.n_cycles} short calls.`,
+  ].map(t => `<li>${t}</li>`).join(''));
+
+  const Cy = P.cycles;
+  const grp = c => c.outcome === 'OPEN' ? 'open' : (c.outcome === 'EXPIRED' ? 'kept' : 'hit');
+  const names = { kept: 'expired worthless', hit: 'in the money', open: 'still open' };
+  const cols = { kept: KEPT, hit: HIT, open: FAINT };
+  Plotly.newPlot('plot-cycles', ['kept', 'hit', 'open'].map(g => {
+    const rows = Cy.filter(c => grp(c) === g);
+    return {
+      x: rows.map(c => c.opened), y: rows.map(c => c.short_pnl), type: 'bar', name: names[g],
+      marker: { color: cols[g] }, width: 1000 * 60 * 60 * 24 * 18,
+      customdata: rows.map(c => [contract(c.strike, c.expiry), money(c.premium), c.settle ? money(c.settle) : '—']),
+      hovertemplate: '%{customdata[0]}<br>premium %{customdata[1]} · settle %{customdata[2]}' +
+        '<br>%{y:$,.0f}<extra></extra>',
+    };
+  }), layout({
+    hovermode: 'closest', barmode: 'overlay',
+    xaxis: axis({ type: 'date' }),
+    yaxis: axis({ title: ytitle('short call P&L ($)'), tickformat: '$,.0f',
+                  zeroline: true, zerolinecolor: INK, zerolinewidth: 1 }),
+  }), CONFIG);
+
+  document.querySelector('#t-lots tbody').innerHTML = P.lots.map(l => `<tr>
+    <td class="l"><b>${contract(l.strike, l.expiry)}</b></td>
+    <td class="l">${l.opened}</td><td class="l">${l.closed || '<span style="color:' + FAINT + '">open</span>'}</td>
+    <td>${num(l.spot)}</td>
+    <td>${money(l.price)}</td><td>${money(l.intrinsic)}</td><td>${money(l.extrinsic)}</td>
+    <td>${money(l.carry)}</td><td>${num(l.rate_pct)}%</td>
+    <td>${money(l.exit)}</td><td${cls(l.pnl)}><b>${signed(l.pnl, 0)}</b></td>
+    <td>${money(l.freed, 0)}</td><td>${money(l.carry_held, 0)}</td>
+    <td>${money(l.tbill_on_freed, 0)}</td></tr>`).join('');
+  setHTML('carry-note',
+    `<b>Read the two interest columns together.</b> A deep in-the-money call is partly a loan:
+     the holder pays the strike at expiry instead of today, and the option's price includes the
+     interest on that, K(1 − e<sup>−rT</sup>). In 2022, with T-bills near zero, the charge was
+     nothing ($0.09 a share on the first LEAPS); from late 2023, at 4–5%, it was around half of
+     the time value paid. "Financing used while held" is the part of that charge consumed
+     between purchase and sale, at the entry rate; "T-bill earned on freed cash" is what the
+     money not spent on shares earned over the same days. Over the five
+     completed LEAPS: <b>${money(S.carry_held, 0)}</b> against <b>${money(S.tbill_freed, 0)}</b>.
+     The PMCC's capital saving is real, but it is not a saving in cost — the cash it doesn't tie
+     up earns about what the LEAPS charges for not tying it up. By put–call parity the rest of
+     the time value is a put, less the dividends the call never receives: downside protection
+     below the LEAPS strike that the covered call does not have. It is what bends the PMCC's
+     curve on the left of the chart in 01.`);
+})();
+
+/* ══ 06 · grid ══════════════════════════════════════════════════════ */
+(function grid() {
+  const G = P.grid;
+  document.querySelector('#t-grid tbody').innerHTML = G.map(g => `<tr${g.headline ? ' class="hl"' : ''}>
+    <td class="l">${num(g.long_delta)}</td><td class="l">${num(g.short_delta)}</td>
+    <td class="l">${g.gap_rule ? 'on' : '<b>off</b>'}</td>
+    <td>${signed(g.pmcc_pnl, 0)}</td><td>${signed(g.pmcc_natural, 0)}</td>
+    <td>${money(g.pmcc_capital, 0)}</td><td>${num(g.pmcc_roc, 0)}%</td>
+    <td class="neg">${signed(g.pmcc_max_dd, 0)}</td><td>${signed(g.cc_pnl, 0)}</td>
+    <td${cls(g.pmcc_pnl - g.cc_pnl)}>${signed(g.pmcc_pnl - g.cc_pnl, 0)}</td>
+    <td${cls(g.overlay_pnl)}>${signed(g.overlay_pnl, 0)}</td>
+    <td>${g.assigned} / ${g.cycles}</td><td>${g.bound}</td></tr>`).join('');
+  const gaps = G.map(g => g.pmcc_pnl - g.cc_pnl);
+  const on = G.filter(g => g.gap_rule), head = G.find(g => g.headline), off = G.find(g => !g.gap_rule);
+  const worst = Math.min(...on.map(g => g.pmcc_pnl));
+  setHTML('grid-cap',
+    `The headline row is the textbook default, fixed before the run${head.pmcc_pnl === worst
+      ? ' — and it turns out to be the weakest PMCC of the nine' : ''}. In every row the PMCC
+     trails the covered call writing the same calls (by ${money(Math.abs(Math.max(...gaps)), 0)} to
+     ${money(Math.abs(Math.min(...gaps)), 0)}), and the short calls lose money. That gap depends
+     only on the long delta: the short calls are the same in both books, so they cancel. Deeper
+     LEAPS (0.90)
+     earn more because they are closer to the stock and need the gap rule less, but cost more
+     capital. Switching the gap rule off barely moves the P&amp;L (${signed(off.pmcc_pnl, 0)} vs
+     ${signed(head.pmcc_pnl, 0)}) and raises assignments from ${head.assigned} to ${off.assigned}. None
+     of these rows were used to choose the headline.`);
+})();
+
+/* ══ 07 · checks ════════════════════════════════════════════════════ */
+document.querySelector('#t-look tbody').innerHTML = K.lookahead.map(x => `<tr>
+  <td class="l">${x.upto}</td><td>${x.trades}</td>
+  <td class="l ${x.identical ? 'ok' : 'neg'}">${x.identical ? '✓ identical' : '× DIFFERENT'}</td></tr>`).join('');
+
+(function checks() {
+  const D = K.delta, req = M.chain.reduce((s, c) => s + c.requested, 0),
+        res = M.chain.reduce((s, c) => s + c.resolved, 0);
+  setHTML('checks', [
+    `<b>Delta.</b> Our Black–Scholes delta against LSEG's DELTA field: median gap
+     ${num(D.median_abs, 4)} on ${D.n.toLocaleString()} quotes (90th percentile ${num(D.p90_abs, 3)});
+     ${num(D.near_030_median, 4)} near 0.30 and ${num(D.near_080_median, 4)} near 0.80. LSEG's field
+     is blank on ${D.lseg_missing} tradeable quotes, ${D.lseg_missing_2022} of them in 2022.`,
+    `<b>Mid.</b> (BID + ASK) / 2 equals LSEG's MID_PRICE on every row (largest gap
+     ${num(D.mid_vs_mid_price, 4)}).`,
+    `<b>Stale marks.</b> ${K.carried_marks.stale} of ${K.carried_marks.held.toLocaleString()}
+     held-contract sessions had no two-sided close and carried the previous mid
+     (${num(K.carried_marks.stale / K.carried_marks.held * 100, 1)}%). Fills never use a stale quote.`,
+    `<b>Pull.</b> ${res.toLocaleString()} of ${req.toLocaleString()} constructed RICs resolved; the
+     rest are strikes that never listed. (${res - M.n_contracts} turn up in both legs' pulls,
+     because each January monthly is also that year's LEAPS, hence
+     ${M.n_contracts.toLocaleString()} distinct contracts.) ${K.bands.short_at_top.length + K.bands.long_at_bottom.length === 0
+      ? 'No chosen strike sits on the edge of what was pulled, so the band never limited the rule.'
+      : 'Some picks sit on the band edge: ' + esc(K.bands.short_at_top.concat(K.bands.long_at_bottom).join(', '))}`,
+    `<b>Accounting.</b> Short-call P&amp;L is identical in the two books (gap
+     ${money(K.overlay_identical)}), and the per-call rows below sum to total P&amp;L (gap
+     ${money(K.attribution_gap)}).`,
+  ].map(t => `<li>${t}</li>`).join(''));
+  setHTML('nm-fills', U.pmcc.option_fills);
+  setHTML('nm-comm', money(U.pmcc.option_fills * 0.65, 0));
+  setHTML('nm-move', `${num(S.stock_move_pct, 0)}%`);
+  setHTML('recon', money(K.attribution_gap));
+})();
+
+/* ══ 08 · records ═══════════════════════════════════════════════════ */
+document.querySelector('#t-cycles tbody').innerHTML = P.cycles.map(c => `<tr>
+  <td class="l">${c.opened}</td><td class="l">${c.expiry}</td><td>${num(c.spot)}</td>
+  <td style="color:${MUTED}">${num(c.long_strike, 0)}</td><td><b>${num(c.strike)}</b></td>
+  <td>${num(c.otm_pct, 1)}%</td><td>${num(c.delta)}</td><td>${money(c.premium)}</td>
+  <td style="color:${MUTED}">${c.bound ? num(c.free_strike) : ''}</td>
+  <td class="l"><span class="pill pill-${c.outcome}">${c.outcome}</span></td>
+  <td>${c.settle ? num(c.settle) : '—'}</td>
+  <td${cls(c.short_pnl)}>${signed(c.short_pnl, 0)}</td><td${cls(c.long_pnl)}>${signed(c.long_pnl, 0)}</td>
+  <td${cls(c.pmcc_pnl)}><b>${signed(c.pmcc_pnl, 0)}</b></td><td${cls(c.cc_pnl)}>${signed(c.cc_pnl, 0)}</td>
+  <td class="l" style="color:${MUTED}">${c.earnings || ''}</td></tr>`).join('');
+
+function renderBlotter(f) {
+  const rows = P.trades.filter(t => f === 'all' ? true : f === 'ASSIGN' ? t.side === 'ASSIGN' : t.leg === f);
+  document.querySelector('#t-blotter tbody').innerHTML = rows.map(t => `<tr>
+    <td class="l">${t.date}</td><td class="l">${t.leg === 'long' ? 'LEAPS' : 'short call'}</td>
+    <td class="l"><b>${t.side}</b></td><td class="l">${esc(t.ric)}</td>
+    <td>${t.qty > 0 ? '+' : '−'}${Math.abs(t.qty)}</td><td>${money(t.price, 3)}</td>
+    <td style="color:${MUTED}">${t.half_spread ? money(t.half_spread, 3) : '—'}</td>
+    <td${cls(t.cash)}>${signed(t.cash)}</td><td class="l" style="color:${MUTED}">${t.rule}</td>
+    <td class="note">${esc(t.note)}</td></tr>`).join('');
+  setHTML('blotter-count', `${rows.length} of ${P.trades.length} booked trades`);
 }
 document.querySelectorAll('[data-flt]').forEach(btn => btn.addEventListener('click', () => {
-  document.querySelectorAll('[data-flt]').forEach(b =>
-    b.setAttribute('aria-pressed', String(b === btn)));
+  document.querySelectorAll('[data-flt]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
   renderBlotter(btn.dataset.flt);
 }));
 renderBlotter('all');
 
-document.querySelector('#t-weeks tbody').innerHTML = B.weeks.map(w => `<tr>
-  <td class="l">${w.entry}${w.bought ? '' :
-    ` <span style="color:${FAINT}">carry</span>`}</td>
-  <td class="l">${w.expiry}</td>
-  <td>${num(w.spot)}</td>
-  <td><b>${num(w.strike)}</b></td>
-  <td style="color:${MUTED}">${num(w.otm_pct)}%</td>
-  <td>${num(w.bid)}</td><td>${num(w.ask)}</td><td><b>${num(w.mid)}</b></td>
-  <td class="pos">${signed(w.premium)}</td>
-  <td>${num(w.open_mark)}</td>
-  <td>${num(w.settle)}</td>
-  <td class="l"><span class="pill pill-${w.outcome}">${w.outcome}</span></td>
-  <td${cls(w.stock_pnl)}>${signed(w.stock_pnl)}</td>
-  <td style="color:${MUTED}">${w.intrinsic ? money(w.intrinsic) : '—'}</td>
-  <td${cls(w.call_pnl)}>${signed(w.call_pnl)}</td>
-  <td${cls(w.week_pnl)}><b>${signed(w.week_pnl)}</b></td></tr>`).join('');
-
-document.getElementById('weekcap').innerHTML =
-  `<b>“carry”</b> marks a week that opened already long, because the previous Friday's
-   call expired worthless — no stock was bought and the basis carried, so that week is
-   marked from the previous settle rather than from a purchase. That is what keeps the
-   week column from charging the same move twice: the ten weeks sum to
-   ${signed(B.weeks.reduce((a, w) => a + w.week_pnl, 0))}, against an actual NAV change
-   of ${signed(S.pnl)}.`;
-
-/* ══ 05 · ledger ════════════════════════════════════════════════════ */
-function renderLedger(view) {
-  let rows = B.ledger;
-  if (view === 'day') {
+const LED = { book: 'pmcc', view: 'month' };
+function renderLedger() {
+  let rows = P.ledger[LED.book];
+  if (LED.view === 'month') {
     const last = new Map();
-    B.ledger.forEach(r => last.set(r.ts.slice(0, 10), r));
+    rows.forEach(r => last.set(r.date.slice(0, 7), r));
     rows = [...last.values()];
-  } else if (view === 'open') {
-    rows = B.ledger.filter(r => r.call !== null);
   }
   document.querySelector('#t-ledger tbody').innerHTML = rows.map(r => `<tr>
-    <td class="l">${hhmm(r.ts)}</td>
-    <td>${r.shares}</td>
-    <td>${num(r.stock_mark)}</td>
-    <td class="l" style="color:${r.call ? INK : FAINT}">${r.call
-      ? `${num(r.strike)}C ${r.expiry.slice(5)}` : '—'}</td>
-    <td>${r.call_mark === null ? '—' : num(r.call_mark, 3)}</td>
-    <td${cls(r.cash)}>${money(r.cash)}</td>
-    <td>${money(r.stock_mv)}</td>
-    <td${cls(r.option_mv)}>${money(r.option_mv)}</td>
-    <td><b>${money(r.nav)}</b></td>
-    <td>${money(r.lmv)}</td>
-    <td>${money(r.initial)}</td>
-    <td>${money(r.maint)}</td>
-    <td${cls(r.available)}>${money(r.available)}</td>
-    <td>${money(r.excess)}</td></tr>`).join('');
-  document.getElementById('ledger-count').textContent =
-    `${rows.length} of ${B.ledger.length} hourly bars`;
+    <td class="l">${r.date}</td><td>${num(r.spot)}</td><td>${r.shares}</td>
+    <td class="l">${short(r.long)}</td><td>${r.long_mark === null ? '—' : num(r.long_mark, 3)}</td>
+    <td class="l">${short(r.short)}</td><td>${r.short_mark === null ? '—' : num(r.short_mark, 3)}</td>
+    <td${cls(r.cash)}>${money(r.cash)}</td><td>${money(r.stock_mv)}</td><td>${money(r.long_mv)}</td>
+    <td${cls(r.short_mv)}>${money(r.short_mv)}</td><td${cls(r.nav)}><b>${signed(r.nav)}</b></td>
+    <td>${num(r.delta, 1)}</td></tr>`).join('');
+  setHTML('ledger-count', `${rows.length} of ${P.ledger[LED.book].length} sessions`);
 }
-document.querySelectorAll('[data-led]').forEach(btn => btn.addEventListener('click', () => {
-  document.querySelectorAll('[data-led]').forEach(b =>
-    b.setAttribute('aria-pressed', String(b === btn)));
-  renderLedger(btn.dataset.led);
-}));
-renderLedger('day');
+['book', 'led'].forEach(attr => document.querySelectorAll(`[data-${attr}]`).forEach(btn =>
+  btn.addEventListener('click', () => {
+    document.querySelectorAll(`[data-${attr}]`).forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    if (attr === 'book') LED.book = btn.dataset.book; else LED.view = btn.dataset.led;
+    renderLedger();
+  })));
+renderLedger();
 
-/* ══ 06 · mid vs print ══════════════════════════════════════════════ */
-(function scatter() {
-  const F = B.fit, P = F.points;
-  const lo = 0.01, hi = Math.max(...P.map(p => p[0])) * 1.15;
-  const xs = [];
-  for (let i = 0; i <= 120; i++) xs.push(lo * Math.pow(hi / lo, i / 120));
-
-  const traces = [
-    { x: [lo, hi], y: [lo, hi], type: 'scatter', mode: 'lines', name: 'print = mid',
-      line: { color: FAINT, width: 1.4, dash: 'dash' }, hoverinfo: 'skip' },
-    /* plain SVG scatter, not scattergl: 2.5k markers render fine without
-       WebGL, and a chart that shows "WebGL is not supported" to anyone with
-       it disabled is not a chart. */
-    { x: P.map(p => p[0]), y: P.map(p => p[1]), type: 'scatter', mode: 'markers',
-      name: 'hourly bar', showlegend: false,
-      marker: {
-        size: 5, opacity: 0.5, color: P.map(p => p[2]),
-        colorscale: [[0, NAVC], [0.5, '#CFC8BA'], [1, REQ]],
-        cmin: -8, cmax: 8,
-        colorbar: { title: { text: 'moneyness %', font: { family: SERIF, size: 11 } },
-                    thickness: 9, len: 0.55, y: 0.28, outlinewidth: 0,
-                    tickfont: { family: MONO, size: 10, color: MUTED } },
-      },
-      hovertemplate: 'mid %{x:$,.2f}<br>print %{y:$,.2f}<extra></extra>' },
-    { x: xs, y: xs.map(v => F.overall.intercept + F.overall.slope * v),
-      type: 'scatter', mode: 'lines', name: 'OLS fit',
-      line: { color: INK, width: 2 }, hoverinfo: 'skip' },
-  ];
-  Plotly.newPlot('plot-scatter', traces, layout({
-    hovermode: 'closest',
-    title: { text: `TRDPRC_1 against mid · R² = ${F.overall.r2}`, x: 0, xanchor: 'left',
-             font: { family: SERIF, size: 15, color: INK } },
-    margin: { l: 66, r: 22, t: 46, b: 48 },
-    /* inside the plot, top-left: on a y ≈ x scatter that corner is the only
-       reliably empty one, and it keeps the legend off the title */
-    legend: { x: 0.02, y: 0.98, xanchor: 'left', yanchor: 'top',
-              bgcolor: 'rgba(255,255,255,0.88)', bordercolor: RULE, borderwidth: 1,
-              font: { family: MONO, size: 11 } },
-    xaxis: axis({ type: 'log', title: { text: 'mid = (BID+ASK)/2 ($)',
-                  font: { family: SERIF, size: 12, color: INK } }, tickprefix: '$' }),
-    yaxis: axis({ type: 'log', title: { text: 'TRDPRC_1 ($)',
-                  font: { family: SERIF, size: 12, color: INK } }, tickprefix: '$' }),
-  }), CONFIG);
-
-  document.getElementById('fitcap').innerHTML =
-    `<b>TRDPRC_1 = ${F.overall.intercept >= 0 ? '' : '−'}${Math.abs(F.overall.intercept).toFixed(4)}
-     + ${F.overall.slope.toFixed(4)} × mid</b>, R² = <b>${F.overall.r2}</b> on
-     ${F.n_pairs.toLocaleString()} hourly bars across ${F.n_contracts} contracts where
-     both a two-sided quote and a print exist. Near the money (within 2%, the band this
-     book writes in) R² = ${F.cuts.near.r2} on ${F.cuts.near.n.toLocaleString()} bars,
-     slope ${F.cuts.near.slope}.<br>
-     Axes are logarithmic so the penny wings are visible next to the $${F.overall.x_hi}
-     in-the-money calls; the fitted line is the linear fit drawn on log axes, which is
-     why it bends. Colour is moneyness — <span style="color:${REQ}">red in the
-     money</span>, <span style="color:${NAVC}">blue out</span>. The dashed
-     <em>print = mid</em> reference is under the fitted line and invisible at this
-     scale: that is the result, not a missing trace.`;
-})();
-
-(function resid() {
-  const H = B.fit.resid_hist;
-  Plotly.newPlot('plot-resid', [{
-    x: H.centres, y: H.counts, type: 'bar', name: 'hourly bars',
-    marker: { color: QUOTE, line: { color: CARD, width: 1 } },
-    hovertemplate: '%{y:,} bars<br>%{x} half-spreads<extra></extra>',
-  }], layout({
-    hovermode: 'closest', bargap: 0.08, showlegend: false,
-    title: { text: 'Where the print landed inside its quote', x: 0, xanchor: 'left',
-             font: { family: SERIF, size: 15, color: INK } },
-    margin: { l: 66, r: 22, t: 54, b: 48 },
-    shapes: [-1, 0, 1].map(v => ({
-      type: 'line', x0: v, x1: v, y0: 0, y1: 1, yref: 'paper',
-      line: { color: v === 0 ? INK : FAINT, width: v === 0 ? 1.6 : 1, dash: 'dot' },
-    })),
-    annotations: [[-1, 'bid'], [0, 'mid'], [1, 'ask']].map(([v, t]) => ({
-      x: v, y: 1.0, yref: 'paper', text: t, showarrow: false,
-      font: { family: MONO, size: 10.5, color: v === 0 ? INK : MUTED },
-      yanchor: 'bottom',
-    })),
-    xaxis: axis({ title: { text: '(print − mid) ÷ half-spread',
-                  font: { family: SERIF, size: 12, color: INK } },
-                  range: [-1.6, 1.6] }),
-    yaxis: axis({ title: { text: 'hourly bars', font: { family: SERIF, size: 12, color: INK } } }),
-  }), CONFIG);
-})();
-
-document.querySelector('#t-orders tbody').innerHTML = B.order_bars.map(o => `<tr>
-  <td class="l">${o.entry}</td>
-  <td><b>${num(o.strike)}</b></td>
-  <td>${num(o.bid)}</td><td>${num(o.ask)}</td>
-  <td><b>${num(o.mid)}</b></td>
-  <td>${o.trade === null ? '<span class="neg">no print</span>' : num(o.trade)}</td>
-  <td${cls(o.vs_mid)}>${o.vs_mid === null ? '—' :
-    (o.vs_mid > 0 ? '+' : o.vs_mid < 0 ? '−' : '') + Math.abs(o.vs_mid).toFixed(3)}</td>
-  <td>${o.volume === null ? '—' : o.volume.toLocaleString()}</td>
-  <td style="color:${MUTED}">${o.moves === null ? '—' : o.moves.toLocaleString()}</td></tr>`).join('');
-
-(function ordercap() {
-  const F = B.fit, O = F.order_bar;
-  document.getElementById('ordercap').innerHTML =
-    `<b>${O.n_traded} of ${O.n} traded on their own order bar</b>, on volume between
-     ${O.min_volume.toLocaleString()} and ${O.max_volume.toLocaleString()} contracts and
-     hundreds of separate moves. Across the whole chain,
-     <b>${F.pct_inside}%</b> of prints land inside their own quote, the median spread is
-     ${money(F.median_spread)} (${F.median_spread_pct}% of the mid), and the median print
-     sits ${F.median_z} half-spreads from the mid — unbiased. The mean leans
-     ${F.mean_z} toward the offer, which for a seller is a small optimism; on this
-     book's own ten orders the tape actually printed an average of
-     ${money(O.mean_vs_mid, 3)} <em>above</em> the assumed fill, worth
-     ${money(O.total_dollars)} in total. <b>The fill assumption is not where this
-     backtest is wrong.</b>`;
-})();
-
-/* ══ 07 · attribution ═══════════════════════════════════════════════ */
-(function attrib() {
-  const W = B.weeks, lab = W.map(w => w.expiry.slice(5));
-  const bar = (key, name, color) => ({
-    x: lab, y: W.map(w => w[key]), type: 'bar', name,
-    marker: { color, line: { color: CARD, width: 2 } },
-    hovertemplate: '%{y:$,.0f}<extra>' + name + '</extra>',
-  });
-  Plotly.newPlot('plot-attrib', [
-    bar('stock_pnl', 'stock leg (open → settle)', NAVC),
-    bar('call_pnl', 'call leg (premium − intrinsic)', REQ),
-    { x: lab, y: W.map(w => w.week_pnl), type: 'scatter', mode: 'markers',
-      name: 'week total', marker: { symbol: 'diamond', size: 10, color: INK,
-      line: { color: CARD, width: 1.5 } },
-      hovertemplate: '%{y:$,.0f}<extra>week total</extra>' },
-  ], layout({
-    barmode: 'group', bargap: 0.28, bargroupgap: 0.06,
-    xaxis: axis({ title: { text: 'expiry', font: { family: SERIF, size: 12, color: INK } },
-                  type: 'category' }),
-    yaxis: axis({ title: { text: 'P&L ($)', font: { family: SERIF, size: 12, color: INK } },
-                  tickprefix: '$', zeroline: true, zerolinecolor: INK, zerolinewidth: 1 }),
-  }), CONFIG);
-})();
+setHTML('foot', `${M.ticker} PMCC · ${S.n_cycles} short calls · ${P.lots.length} LEAPS · ` +
+  `${P.trades.length} booked trades · ${M.sessions} sessions · look-ahead test ` +
+  `${K.lookahead.every(x => x.identical) ? 'passed' : 'FAILED'} at ${K.lookahead.length} cut dates`);

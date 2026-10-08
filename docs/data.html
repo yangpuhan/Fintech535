@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Data · Covered Call Backtest</title>
+<title>Data · Fintech 535</title>
 <meta name="description" content="Where the numbers came from, and why this page cannot fetch new ones on GitHub Pages.">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;600;700&display=swap">
 <style>
@@ -69,7 +69,8 @@
 <div class="wrap">
 
 <nav>
-  <a href="./">1.2 · Covered Call</a>
+  <a href="./">1.3 · Poor Man's Covered Call</a>
+  <a href="1.2/">1.2 · Covered Call</a>
   <a href="1.1/">1.1 · Option Surface Lab</a>
   <span class="here">Data</span>
   <a href="https://github.com/yangpuhan/Fintech535">Source</a>
@@ -88,16 +89,29 @@
     <p>Looking for the fetch server on <code>127.0.0.1:8765</code>.</p></div>
 </div>
 
-<h2>The cached pull</h2>
-<p>Everything the published site shows was pulled once from LSEG and baked into
-   <code>book.js</code>. GitHub Pages serves files and nothing else, so the backtest
-   cannot be re-run in the browser and the tape cannot be refreshed from it.</p>
+<h2>The cached pulls</h2>
+<p>Everything the published site shows was pulled once from LSEG and baked into a
+   JavaScript file per assignment (<code>pmcc.js</code>, <code>1.2/book.js</code>).
+   GitHub Pages serves files and nothing else, so no backtest can be re-run in the
+   browser and the tape cannot be refreshed from it.</p>
+<h3 style="font-size:16px;margin:22px 0 8px">1.3 · Poor Man's Covered Call — daily</h3>
+<table id="prov13"><tbody></tbody></table>
+<h3 style="font-size:16px;margin:22px 0 8px">1.2 · Covered Call — hourly</h3>
 <table id="provenance"><tbody></tbody></table>
 
 <h2>Chain resolution</h2>
-<p>Synthetic RICs name contracts that may never have listed. Requests go out in
-   batches and split on failure, so one dead name costs a bisect rather than the whole
-   batch. This is what resolved, per expiry.</p>
+<p>Synthetic RICs name contracts that may never have listed. The hourly endpoint (1.2)
+   fails a whole batch on one dead name, so batches bisect on failure; the daily
+   endpoint (1.3) drops dead names silently and returns the rest. Either way the
+   per-expiry count is kept, so a missing contract is visible. Contracts expiring after
+   the pull use the live RIC with no <code>^</code> suffix.</p>
+<h3 style="font-size:16px;margin:22px 0 8px">1.3 — monthly short calls and January LEAPS</h3>
+<table id="chain13">
+  <thead><tr><th>leg</th><th>expiry</th><th class="r">strikes pulled</th>
+    <th class="r">requested</th><th class="r">resolved</th><th class="r">rate</th></tr></thead>
+  <tbody></tbody>
+</table>
+<h3 style="font-size:16px;margin:22px 0 8px">1.2 — weekly calls</h3>
 <table id="chain">
   <thead><tr><th>expiry</th><th class="r">requested</th><th class="r">resolved</th>
     <th class="r">rate</th></tr></thead>
@@ -108,8 +122,10 @@
 <p>The fetcher is a tool, not part of the published site. It needs LSEG Workspace
    running and an app key in <code>lseg-data.config.json</code>, which is gitignored
    and never leaves the machine.</p>
-<pre>python -m covered_call.fetch    # LSEG  ->  covered_call/data.pkl
-python -m covered_call.build    # data.pkl  ->  docs/book.js
+<pre>python -m pmcc.fetch            # LSEG  ->  pmcc/data.pkl
+python -m pmcc.build            # data.pkl  ->  docs/pmcc.js
+python -m covered_call.fetch    # LSEG  ->  covered_call/data.pkl
+python -m covered_call.build    # data.pkl  ->  docs/1.2/book.js
 
 python covered_call/local_server.py
 # http://127.0.0.1:8765/data.html</pre>
@@ -125,16 +141,37 @@ python covered_call/local_server.py
 
 <footer>
   Data from LSEG · <span id="foot"></span><br>
-  <a href="./">Back to the backtest</a> ·
+  <a href="./">Back to 1.3</a> ·
   <a href="https://github.com/yangpuhan/Fintech535">github.com/yangpuhan/Fintech535</a>
 </footer>
 </div>
 
-<script src="book.js"></script>
+<script src="pmcc.js"></script>
+<script src="1.2/book.js"></script>
 <script>
 'use strict';
 const M = window.BOOK.meta;
 const fmt = n => n.toLocaleString('en-US');
+const Q = window.PMCC.meta;
+
+document.querySelector('#prov13 tbody').innerHTML = [
+  ['underlying', `${Q.ticker} (${Q.stock_ric}), rate ${Q.rate_ric}`],
+  ['bar size', '1 day — closing quotes for every leg'],
+  ['window', `${Q.first_fill} → ${Q.end}, ${fmt(Q.sessions)} sessions`],
+  ['option contracts', `${fmt(Q.n_contracts)} (monthly calls + January LEAPS)`],
+  ['daily option quotes', fmt(Q.n_option_rows)],
+  ['also pulled', 'dividends (ex-date, amount), earnings report dates'],
+  ['fetched', Q.fetched_at],
+  ['synthetic', Q.synthetic ? 'yes' : 'no — a real LSEG pull'],
+].map(([k, v]) => `<tr><td style="color:#6E6A63">${k}</td><td>${v}</td></tr>`).join('');
+
+document.querySelector('#chain13 tbody').innerHTML = Q.chain.map(c => {
+  const r = c.requested ? Math.round(c.resolved / c.requested * 100) : 0;
+  return `<tr><td>${c.leg === 'long' ? 'LEAPS' : 'monthly'}</td><td>${c.expiry}</td>` +
+         `<td class="r">${c.lo}–${c.hi}</td><td class="r">${c.requested}</td>` +
+         `<td class="r">${c.resolved}</td><td class="r" style="color:${
+           r === 100 ? '#2C7A2C' : '#6E6A63'}">${r}%</td></tr>`;
+}).join('');
 
 document.querySelector('#provenance tbody').innerHTML = [
   ['underlying', `${M.ticker} (${M.stock_ric})`],
@@ -156,7 +193,8 @@ document.querySelector('#chain tbody').innerHTML = M.chain.map(c => {
 }).join('');
 
 document.getElementById('foot').textContent =
-  `cached ${M.fetched_at} · ${fmt(M.n_contracts)} contracts · ${fmt(M.n_option_bars)} option bars`;
+  `1.3 cached ${Q.fetched_at} · ${fmt(Q.n_contracts)} contracts · ` +
+  `1.2 cached ${M.fetched_at} · ${fmt(M.n_contracts)} contracts`;
 
 /* The one thing this page does at runtime: ask whether a local fetch server is
    listening. On github.io nothing is, and it must say so rather than pretend. */
@@ -172,7 +210,7 @@ const onPages = location.protocol === 'https:' || location.hostname.endsWith('gi
     set('off', '×', 'Data connection required',
       'This is the published build on GitHub Pages. There is no data server behind it ' +
       'and no LSEG entitlement in the browser, so nothing here can be refreshed — every ' +
-      'number on the site comes from the cached pull below. To fetch, clone the repo and ' +
+      'number on the site comes from the cached pulls below. To fetch, clone the repo and ' +
       'run <code>python covered_call/local_server.py</code> with LSEG Workspace open.');
     return;
   }
@@ -185,7 +223,7 @@ const onPages = location.protocol === 'https:' || location.hostname.endsWith('gi
     if (j.lseg) {
       set('on', '✓', 'Data connection live',
         `LSEG Workspace is reachable from this machine (${j.session}). ` +
-        '<code>python -m covered_call.fetch</code> will re-pull the tape.');
+        '<code>python -m pmcc.fetch</code> will re-pull the tape.');
     } else {
       set('off', '×', 'Data connection required',
         'The local server is running, but LSEG Workspace is not reachable — ' +

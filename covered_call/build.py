@@ -26,7 +26,9 @@ from .book import (INITIAL_RATE, MAINT_RATE, OPENING_CASH, load, option_frame,
                    run, stock_series)
 from .fit import analyse, order_bar_evidence
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+# 1.2 lives in its own folder now that 1.3 has the site root
+SITE = Path(__file__).resolve().parents[1] / "docs"
+DOCS = SITE / "1.2"
 SCATTER_POINTS = 2500
 
 
@@ -115,7 +117,7 @@ def bundle() -> dict:
 def main() -> Path:
     data = bundle()
     DOCS.mkdir(parents=True, exist_ok=True)
-    (DOCS / ".nojekyll").write_text("", encoding="utf-8")
+    (SITE / ".nojekyll").write_text("", encoding="utf-8")
 
     payload = json.dumps(_clean(data), separators=(",", ":"))
     out = DOCS / "book.js"

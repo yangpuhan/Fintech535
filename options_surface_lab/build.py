@@ -185,7 +185,8 @@ def page(underlying: str) -> str:
 <div class="wrap">
 
   <nav>
-    <a href="../">1.2 · Covered Call</a>
+    <a href="../">1.3 · Poor Man's Covered Call</a>
+    <a href="../1.2/">1.2 · Covered Call</a>
     <span class="here">1.1 · Option Surface Lab</span>
     <a href="../data.html">Data</a>
     <a href="https://github.com/yangpuhan/Fintech535">Source</a>
@@ -291,7 +292,8 @@ def page(underlying: str) -> str:
   <footer>
     Data from LSEG · mark = {MARK_FIELD} (closing NBBO mid) · print = {PRINT_FIELD} (last trade)<br>
     Figures pre-rendered from the cached pickle; controls run in the browser.<br>
-    <a href="../" style="color:var(--muted)">Assignment 1.2 · Covered Call Backtest</a> ·
+    <a href="../" style="color:var(--muted)">Assignment 1.3 · Poor Man's Covered Call</a> ·
+    <a href="../1.2/" style="color:var(--muted)">Assignment 1.2 · Covered Call Backtest</a> ·
     <a href="https://github.com/yangpuhan/Fintech535" style="color:var(--muted)">github.com/yangpuhan/Fintech535</a>
   </footer>
 </div>
