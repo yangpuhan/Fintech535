@@ -11,10 +11,83 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| 1.3 | [`pmcc/`](pmcc/) | **[/](https://yangpuhan.github.io/Fintech535/)** | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
+| 1.4 | [`wheel/`](wheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
+| 1.3 | [`pmcc/`](pmcc/) | [/1.3/](https://yangpuhan.github.io/Fintech535/1.3/) | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
 | 1.1 | [`options_surface_lab/`](options_surface_lab/) | [/1.1/](https://yangpuhan.github.io/Fintech535/1.1/) | Expired UUUU option contracts. Listed options are a sparse cloud, not a filled sheet — and the closing mid is not a price anyone paid. |
 |  | — | [/data.html](https://yangpuhan.github.io/Fintech535/data.html) | Provenance, chain resolution, and the live/no-live connection state. |
+
+---
+
+## 1.4 — The Wheel
+
+Sell cash-secured puts; if assigned, sell covered calls on the shares; if
+called away, start again. AAPL, every session from 3 Jan 2022 to 30 Sep 2025,
+in a $100,000 cash account. The same engine also runs the wheel's two halves
+on their own — **put-write** (puts forever, settled in cash) and
+**buy-write** (shares plus calls forever) — so the comparison says what the
+switching itself does.
+
+```
+wheel/
+  fetch.py    the LSEG pull  ->  data.pkl                   (run once, by hand)
+  data.pkl    2,560 monthly AAPL puts + calls, daily; the hourly year LSEG
+              keeps (Nov 2025 - Oct 2026) for the fill test; stock, T-bill,
+              dividends, earnings dates
+  greeks.py   Black-Scholes IV and delta for both rights (puts by parity on 1.3's calls)
+  fills.py    the fill assumption, measured: where real prints land in the spread
+  book.py     the rules -> blotter, daily ledger, controls, stats, look-ahead test
+  build.py    -> docs/wheel.js                              (what Pages serves)
+```
+
+### The rule
+
+| | |
+|---|---|
+| **Timing** | decide on the t-1 close, fill on the t close (daily bars, as 1.3) |
+| **Put** | no shares: first monthly with >= 21 days, delta closest to -0.30, as many contracts as the cash secures |
+| **Assigned** | buy 100 shares a contract at the strike; basis = strike - that put's premium - calls sold since |
+| **Call** | shares: one call per 100, first monthly >= 21 days, delta closest to 0.30 among strikes >= basis |
+| **Called away** | deliver at the strike, back to cash and puts |
+| **Roll** | buy back at 50% of the premium and sell the next one, on a later expiry, in the same order; otherwise hold to expiry |
+| **Early** | call before an ex-date if time value < dividend; put if time value < interest on the strike |
+| **Fills** | sell at mid - k x half-spread, buy at mid + k x half-spread; k measured on the hourly tape |
+| **Cash** | earns the 3-month T-bill, including the cash securing a put |
+
+### The fill, measured
+
+35,274 hourly prints on 257 out-of-the-money AAPL monthlies: 85.6% inside
+their own quote, symmetric around the mid (21.6% at the bid, 21.8% at the
+ask, 28.7% within a quarter-spread of the mid). The average print gives up
+**k = 0.57** of the half-spread, so the book sells at mid - 0.57 x half and
+buys at mid + 0.57 x half. The same statistic on the daily tape is 0.55-0.63
+in every backtest year. Every one of the book's 107 option fills was in a
+contract that traded that day (median 4,444 contracts; the order a median
+0.14% of it), and on every day the contract's own range reached the fill.
+
+### What it found
+
+| $100,000, 3 Jan 2022 - 30 Sep 2025 | wheel | buy & hold | put-write | buy-write | T-bills |
+|---|---|---|---|---|---|
+| final | **$162,273** | $142,052 | $109,795 | $113,849 | $117,028 |
+| CAGR | **13.81%** | 9.83% | 2.53% | 3.53% | 4.29% |
+| volatility | 19.6% | 28.8% | 12.9% | 17.3% | 0.2% |
+| Sharpe | **0.55** | 0.32 | -0.07 | 0.04 | - |
+| max drawdown | -23.4% | -32.9% | -23.1% | -23.7% | 0 |
+
+The thesis (short volatility against paid-up collateral: lower risk, higher
+Sharpe, lower return) held on risk and Sharpe and failed on return — the
+wheel also out-earned the stock. But not for the reason given. The 0.30-delta
+put was priced above realised vol in 32 of 43 months (+1.3 pts) and the call
+below it (-2.3 pts); selling either every month and holding to expiry lost
+money, and both halves of the wheel run alone trailed T-bills. The edge is
+timing: shares arrive by assignment after falls and the never-below-basis
+rule keeps them through the rebounds. It is path-sensitive — re-running the
+rule with fills a few cents different moves the Sharpe between 0.37 and 0.55
+(the paths part on 3 Oct 2022, when the basis sat 2.6 cents above a strike) —
+though every re-run still beats buy-and-hold's 0.32. Holding every option to
+expiry instead of rolling at 50% returned 9.43% (Sharpe 0.33); dropping the
+basis rule, Sharpe 0.25.
 
 ---
 
@@ -166,7 +239,8 @@ three times as many contracts as it needed.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python -m pmcc.build                  # data.pkl  → docs/pmcc.js
+python -m wheel.build                 # data.pkl  → docs/wheel.js
+python -m pmcc.build                  # data.pkl  → docs/1.3/pmcc.js
 python -m covered_call.build          # data.pkl  → docs/1.2/book.js
 python -m options_surface_lab.build   # data.pkl  → docs/1.1/
 python covered_call/local_server.py   # http://127.0.0.1:8765/
@@ -178,6 +252,7 @@ To re-pull from LSEG — needs Workspace running and an app key in
 `lseg-data.config.json`, which is gitignored:
 
 ```bash
+python -m wheel.fetch
 python -m pmcc.fetch
 python -m covered_call.fetch
 python -m options_surface_lab.fetch
@@ -204,6 +279,10 @@ INK    #1A1A1A      QUOTE      #7A6A55   drab
 quiet colour, a real trade is rare so it got the loud one. 1.2 keeps the same
 logic — the requirement lines are the thing that can stop you trading, so they
 are the ones in vermilion.
+
+1.4 keeps the logic: vermilion is the wheel, moss is cash with puts sold on
+it, blue is shares (solid with calls written, dotted bare), and the wheel's own
+put and call legs wear moss and blue on every chart.
 
 1.3 compares four books, and encodes them by structure rather than by four
 unrelated hues: colour is what is held long (blue shares, vermilion LEAPS),

@@ -10,6 +10,9 @@ reflex.lock/
 .DS_Store
 .spyproject/
 
+# Resumable fetch cache (wheel/fetch.py); data.pkl is the artifact
+wheel/.cache/
+
 # Virtual environment
 .venv/
 venv/

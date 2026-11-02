@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poor Man's Covered Call · AAPL</title>
+<meta name="description" content="A mechanical Poor Man's Covered Call on AAPL, January 2022 to October 2026, on daily LSEG closes — against a covered call writing the identical calls.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;600;700&display=swap">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    color-scheme: light;
+    /* "Paper" — the identity from 1.1, carried forward. */
+    --paper:#FAF8F3; --card:#FFFFFF; --rule:#DDD7CA; --wash:#EFEBE2;
+    --ink:#1A1A1A; --muted:#6E6A63; --faint:#A29D93;
+
+    /* Strategy series. Colour = what is held long (blue shares, vermilion
+       LEAPS); dash = whether calls are written against it (solid yes, dotted
+       no). Blue/vermilion pass every check of the palette validator on the
+       white plot surface (CVD dE 18.3, normal 27.9). */
+    --s-stock:#1D6091;
+    --s-leaps:#C1440E;
+    /* Outcome of a short call. Vermilion/moss is in the 6-8 CVD band, so
+       assigned is solid and expired is dotted everywhere it is drawn. */
+    --s-hit:#C1440E;
+    --s-kept:#2C7A2C;
+
+    --serif:'Source Serif 4','Source Serif Pro',Georgia,serif;
+    --mono:'Source Code Pro','SF Mono',Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+         font-family:var(--serif); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1180px; margin:0 auto; padding:34px 24px 72px; }
+
+  nav { display:flex; gap:18px; align-items:baseline; font-family:var(--mono);
+        font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+        color:var(--muted); margin-bottom:26px; flex-wrap:wrap; }
+  nav a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--rule); }
+  nav a:hover { color:var(--ink); border-color:var(--ink); }
+  nav .here { color:var(--ink); font-weight:600; border-bottom:2px solid var(--ink); }
+  .masthead { border-bottom:2px solid var(--ink); padding-bottom:20px; }
+  .kicker { font-family:var(--mono); font-size:11px; color:var(--muted);
+            letter-spacing:.1em; text-transform:uppercase; }
+  h1 { font-size:46px; margin:6px 0 0; font-weight:700; letter-spacing:-.015em; line-height:1.05; }
+  .lede { font-size:18px; color:var(--muted); max-width:66ch; line-height:1.55; margin:12px 0 0; }
+  .prov { font-family:var(--mono); font-size:12px; color:var(--muted); margin:16px 0 0; line-height:1.7; }
+
+  .answer { background:var(--card); border:1.5px solid var(--ink); border-radius:4px;
+            padding:20px 24px; margin:26px 0 0; }
+  .answer h2 { margin:0 0 6px; font-size:15px; font-family:var(--mono); font-weight:700;
+               letter-spacing:.08em; text-transform:uppercase; }
+  .answer ol { margin:8px 0 0; padding-left:22px; }
+  .answer li { font-size:16px; line-height:1.6; margin:7px 0; max-width:92ch; }
+  .answer .rec { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--rule);
+                 font-size:16px; line-height:1.6; max-width:92ch; }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+           gap:12px; margin:18px 0 0; }
+  .card { background:var(--card); border:1px solid var(--rule); border-radius:4px; padding:14px 16px; }
+  .card .lab { font-family:var(--mono); font-size:10.5px; color:var(--muted);
+               letter-spacing:.07em; text-transform:uppercase; }
+  .card .val { font-size:26px; font-weight:700; line-height:1.15; margin-top:6px; }
+  .card .hint { font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.4; }
+
+  h2 { font-size:27px; margin:52px 0 0; font-weight:700; letter-spacing:-.01em; scroll-margin-top:16px; }
+  h2 .n { font-family:var(--mono); font-size:13px; color:var(--faint); font-weight:600;
+          margin-right:10px; vertical-align:2px; }
+  h3 { font-size:17px; margin:26px 0 8px; font-weight:600; }
+  .blurb { font-size:15.5px; color:var(--muted); max-width:76ch; line-height:1.6; margin:8px 0 16px; }
+  p { line-height:1.62; }
+  .panel { background:var(--card); border:1px solid var(--rule); border-radius:4px; padding:14px; }
+  .note { background:var(--wash); border:1px solid var(--rule); border-radius:4px;
+          padding:15px 18px; font-size:14px; color:var(--muted); line-height:1.65;
+          max-width:86ch; margin-top:16px; }
+  .note b { color:var(--ink); }
+  ul.facts { margin:10px 0 0; padding-left:20px; max-width:86ch; }
+  ul.facts li { font-size:15px; line-height:1.6; margin:5px 0; }
+  code, .m { font-family:var(--mono); font-size:.92em; }
+  code { background:var(--wash); padding:1px 5px; border-radius:3px; }
+
+  .rules { display:grid; background:var(--card); border:1px solid var(--rule);
+           border-radius:4px; overflow:hidden; }
+  .rule { display:grid; grid-template-columns:130px 1fr; gap:20px; padding:13px 18px;
+          border-top:1px solid var(--rule); }
+  .rule:first-child { border-top:none; }
+  .rule .tag { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.08em;
+               color:var(--s-stock); text-transform:uppercase; padding-top:2px; }
+  .rule .body { font-size:15px; line-height:1.6; }
+  .rule .body em { color:var(--muted); font-style:normal; }
+
+  .tablewrap { background:var(--card); border:1px solid var(--rule); border-radius:4px;
+               overflow:auto; max-height:560px; }
+  table { border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12px; }
+  thead th { position:sticky; top:0; background:var(--wash); z-index:2; text-align:right;
+             padding:9px 9px; font-size:10px; font-weight:600; letter-spacing:.05em;
+             text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--rule);
+             white-space:nowrap; }
+  thead th:first-child, thead th.l { text-align:left; }
+  tbody td { padding:6px 9px; text-align:right; border-bottom:1px solid var(--wash);
+             white-space:nowrap; font-variant-numeric:tabular-nums; }
+  tbody td.l { text-align:left; }
+  tbody tr:hover { background:#FCFAF5; }
+  tbody tr.hl td { background:#F6F1E6; font-weight:600; }
+  tbody tr.sum td { border-top:1.5px solid var(--ink); font-weight:700; }
+  tbody td.note { background:none; border:none; border-bottom:1px solid var(--wash);
+                  font-family:var(--serif); font-size:12px; color:var(--muted);
+                  white-space:normal; min-width:220px; max-width:320px; text-align:left;
+                  padding:6px 9px; line-height:1.45; }
+  .neg { color:var(--s-hit); }
+  .pos { color:var(--s-kept); }
+  .key { display:inline-block; width:22px; height:0; vertical-align:middle; margin-right:7px;
+         border-top:2.5px solid; }
+  .key.dot { border-top-style:dotted; }
+  .pill { display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:700;
+          letter-spacing:.05em; padding:1px 6px; border-radius:3px; border:1px solid currentColor; }
+  .pill-ASSIGNED, .pill-EARLY { color:var(--s-hit); }
+  .pill-EXPIRED { color:var(--s-kept); }
+  .pill-OPEN { color:var(--muted); }
+  .tcap { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:9px 0 0;
+          line-height:1.6; max-width:120ch; }
+  .ok { color:var(--s-kept); font-weight:700; }
+
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0; }
+  button { font-family:var(--mono); font-size:12px; padding:6px 12px; cursor:pointer;
+           border:1px solid var(--rule); border-radius:3px; background:var(--card); color:var(--muted); }
+  button:hover { border-color:var(--ink); color:var(--ink); }
+  button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:var(--paper); font-weight:600; }
+  .count { font-family:var(--mono); font-size:11.5px; color:var(--faint); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+  footer { border-top:1px solid var(--ink); margin-top:60px; padding-top:18px;
+           font-family:var(--mono); font-size:12px; color:var(--muted); line-height:1.8; }
+  footer a { color:var(--muted); }
+  footer pre { font-family:var(--mono); font-size:12px; background:var(--card);
+               border:1px solid var(--rule); border-radius:4px; padding:12px 14px;
+               overflow:auto; line-height:1.7; color:var(--ink); }
+
+  @media (max-width:820px) {
+    h1 { font-size:33px; } h2 { font-size:22px; }
+    .two { grid-template-columns:1fr; }
+    .rule { grid-template-columns:1fr; gap:6px; }
+    .wrap { padding:24px 16px 56px; }
+    .answer { padding:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a href="../">1.4 · The Wheel</a>
+  <span class="here">1.3 · Poor Man's Covered Call</span>
+  <a href="../1.2/">1.2 · Covered Call</a>
+  <a href="../1.1/">1.1 · Option Surface Lab</a>
+  <a href="../data.html">Data</a>
+  <a href="https://github.com/yangpuhan/Fintech535">Source</a>
+</nav>
+
+<div class="masthead">
+  <div class="kicker">MENG FinTech · Algorithmic Trading II · Assignment 1.3</div>
+  <h1>Poor Man's Covered Call</h1>
+  <p class="lede">Swap the 100 shares under a covered call for one deep in-the-money LEAPS
+     call, keep writing the same calls against it, and measure what the capital saving
+     actually buys. AAPL, every session from January 2022 to October 2026.</p>
+</div>
+<div class="prov" id="prov">loading…</div>
+
+<div class="answer">
+  <h2>Short answer</h2>
+  <ol id="answer"></ol>
+  <div class="rec" id="rec"></div>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="what"><span class="n">01</span>What the strategy is</h2>
+<p class="blurb">A covered call is 100 shares plus one short call. The PMCC replaces the
+   shares with a long-dated call deep in the money, which moves roughly like the stock
+   but costs a fraction of it. Technically it is a diagonal call spread. Below: the
+   book's first trade, valued at the short call's expiry.</p>
+<div class="two">
+  <div class="panel"><div id="plot-payoff" style="height:400px"></div></div>
+  <div>
+    <ul class="facts" id="payoff-facts"></ul>
+  </div>
+</div>
+<p class="tcap" id="payoff-cap"></p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="rules"><span class="n">02</span>The rules</h2>
+<p class="blurb">Fixed before the backtest ran, at textbook PMCC settings (0.80-delta long,
+   0.30-delta short, 30–45 days). No discretion anywhere: the same tape always produces
+   the same blotter. Section 06 shows what happens with other settings.</p>
+<div class="rules">
+  <div class="rule"><div class="tag">Timing</div><div class="body">
+    <b>Decide on the close of session t−1, fill on the close of t.</b> Every input to a
+    decision — spot, quotes, delta, the T-bill rate — is from the previous close.
+    <em>Daily bars only give closing quotes, so deciding and filling on the same print
+    would be look-ahead. Section 07 tests this directly.</em></div></div>
+  <div class="rule"><div class="tag">Long leg</div><div class="body">
+    Buy 1 call on the <b>nearest January expiry with ≥ 300 days left</b>, at the listed
+    strike with <b>delta closest to 0.80</b>. When it has <b>≤ 120 days left</b>, sell it
+    and buy the next one by the same rule, in one order. Never re-struck otherwise.
+    <em>Six LEAPS over the window, Jan-2023 to Jan-2028.</em></div></div>
+  <div class="rule"><div class="tag">Short leg</div><div class="body">
+    Sell 1 call on the <b>first monthly expiry with ≥ 21 days left</b> (typically 25–35),
+    at the strike with <b>delta closest to 0.30</b> that passes the gap rule. Hold to
+    expiry: no profit-taking, no rolling.</div></div>
+  <div class="rule"><div class="tag">Gap rule</div><div class="body">
+    <b>K<sub>short</sub> − K<sub>long</sub> ≥ mid<sub>long</sub> − mid<sub>short</sub></b>,
+    on the decision close. <em>If AAPL gaps through the short strike, the spread is worth
+    at least its width. The rule makes the width cover what the spread costs today, so a
+    rally can never lose money. It is the textbook "short strike above long strike plus
+    net debit", applied to current marks rather than the original cost. It also keeps
+    K<sub>short</sub> above K<sub>long</sub>, so the short call is always covered and
+    the margin requirement is just the debit.</em></div></div>
+  <div class="rule"><div class="tag">Expiry</div><div class="body">
+    Close ≤ K: expires worthless. Close &gt; K: assigned, settled at intrinsic
+    (S − K) × 100 — deliver at K and buy back on the same close. A new short is decided
+    that evening and sold the next session.</div></div>
+  <div class="rule"><div class="tag">Early exercise</div><div class="body">
+    On the session before an ex-dividend date, a short call in the money with less
+    time value than the dividend is assumed exercised, settled at intrinsic.
+    <em>This happened once, 9 May 2024.</em></div></div>
+  <div class="rule"><div class="tag">Fills</div><div class="body">
+    Options at the <b>closing mid</b>, (BID + ASK) / 2; a sale needs BID &gt; 0. Stock at
+    the closing print. No two-sided quote → no fill, decide again next close. Results
+    are also shown paying the half-spread on every option fill.</div></div>
+  <div class="rule"><div class="tag">Combo</div><div class="body">
+    No short call without a long call under it. If the first long can't fill, neither
+    does the short.</div></div>
+  <div class="rule"><div class="tag">Delta</div><div class="body">
+    Black–Scholes from the closing mid, with the 3-month T-bill yield and the trailing
+    12-month dividend yield. <em>LSEG's own DELTA field is blank on hundreds of quotes in
+    early 2022, so a rule that relied on it could not trade on day one. Ours agrees with
+    LSEG's to a median of <span class="m" id="r-delta"></span> where both exist.</em></div></div>
+  <div class="rule"><div class="tag">Benchmarks</div><div class="body">
+    <b>Covered call</b>: 100 shares bought on the PMCC's first fill, plus <b>exactly the
+    same short calls</b> — same days, strikes and fills. So every dollar between the two is
+    the long leg. <b>Stock</b>: the shares alone. <b>LEAPS only</b>: the long leg alone.
+    Dividends are credited to share-holding books on the ex-date.</div></div>
+  <div class="rule"><div class="tag">Capital</div><div class="body">
+    Cash accounts, no borrowing. <b>Capital required</b> is the smallest opening balance
+    that pays for every trade. For the like-for-like comparison every book gets the same
+    <b id="r-acct"></b>, the largest requirement of the four, and idle cash earns the
+    T-bill rate.</div></div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="results"><span class="n">03</span>Results</h2>
+<p class="blurb">Same account for every book, so the lines can be compared directly.
+   Colour shows what is held (blue = shares, vermilion = LEAPS); a solid line writes calls
+   against it, a dotted line doesn't.</p>
+<div class="panel"><div id="plot-nav" style="height:460px"></div></div>
+
+<h3>Performance</h3>
+<div class="tablewrap" style="max-height:none">
+  <table id="t-perf">
+    <thead><tr>
+      <th class="l">book</th>
+      <th>capital required</th><th>P&amp;L per unit<br>at mid</th><th>paying the<br>half-spread</th>
+      <th>return on<br>capital / yr</th>
+      <th>same-account<br>final</th><th>CAGR</th><th>volatility</th><th>Sharpe</th><th>max drawdown</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<p class="tcap" id="perf-cap"></p>
+
+<h3>By calendar year, same account</h3>
+<div class="tablewrap" style="max-height:none">
+  <table id="t-years"><thead></thead><tbody></tbody></table>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="position"><span class="n">04</span>What the position did</h2>
+<p class="blurb">AAPL's close, the LEAPS strike underneath it, and each short call drawn
+   across the days it was open. Hover any line.</p>
+<div class="panel"><div id="plot-pos" style="height:460px"></div></div>
+<p class="tcap" id="pos-cap"></p>
+
+<h3>Capital at work, per unit</h3>
+<div class="panel"><div id="plot-mv" style="height:300px"></div></div>
+<p class="tcap" id="mv-cap"></p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="money"><span class="n">05</span>Where the money went</h2>
+<div class="two">
+  <div>
+    <h3>Per unit, by leg</h3>
+    <div class="tablewrap" style="max-height:none">
+      <table id="t-attr">
+        <thead><tr><th class="l"></th><th>covered call</th><th>PMCC</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="tcap">The short-call line is identical by construction. The whole gap between
+       the two books is the long leg, which is the question the boss asked.</p>
+  </div>
+  <div>
+    <h3>The short calls</h3>
+    <ul class="facts" id="short-facts"></ul>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:18px"><div id="plot-cycles" style="height:320px"></div></div>
+<p class="tcap">P&amp;L of each short call: premium received minus intrinsic value paid at
+   expiry. The open October call is marked at its mid.</p>
+
+<h3>The LEAPS, and what the saved capital really cost</h3>
+<div class="tablewrap" style="max-height:none">
+  <table id="t-lots">
+    <thead><tr>
+      <th class="l">LEAPS</th><th class="l">bought</th><th class="l">sold</th>
+      <th>spot</th><th>price</th><th>intrinsic</th><th>time<br>value</th>
+      <th>of which<br>financing</th><th>T-bill</th><th>exit</th><th>P&amp;L</th>
+      <th>cash freed<br>vs shares</th><th>financing used<br>while held</th>
+      <th>T-bill earned<br>on freed cash</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<p class="tcap">Price, intrinsic, time value, financing and exit are per share; P&amp;L and the last
+   three columns are dollars per contract. "Of which financing" is K(1 − e<sup>−rT</sup>) at
+   purchase, over the LEAPS's whole remaining life. Each was bought at 0.79–0.81 delta with
+   482–490 days left (the first: 382).</p>
+<div class="note" id="carry-note"></div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="robust"><span class="n">06</span>Does the answer depend on the settings?</h2>
+<p class="blurb">The same backtest across nine delta pairs, plus the headline with the gap
+   rule switched off. Per unit, at mid. The covered call writes whatever calls that
+   PMCC wrote.</p>
+<div class="tablewrap" style="max-height:none">
+  <table id="t-grid">
+    <thead><tr>
+      <th class="l">long Δ</th><th class="l">short Δ</th><th class="l">gap<br>rule</th>
+      <th>PMCC<br>P&amp;L</th><th>paying<br>spreads</th><th>capital</th><th>return on<br>capital</th>
+      <th>max<br>drawdown</th><th>covered<br>call P&amp;L</th><th>PMCC −<br>cov. call</th>
+      <th>short<br>calls</th><th>assigned</th><th>gap rule<br>bound</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<p class="tcap" id="grid-cap"></p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="honest"><span class="n">07</span>Checks</h2>
+<div class="two">
+  <div>
+    <h3>No look-ahead: delete the future, the past must not change</h3>
+    <div class="tablewrap" style="max-height:none">
+      <table id="t-look">
+        <thead><tr><th class="l">tape cut after</th><th>trades up to then</th><th class="l">identical to the full run</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="tcap">Every price series — stock, options, rates — is truncated at the date and
+       the whole book re-run from scratch. If any rule used later data, the earlier trades
+       would come out different. The exchange calendar and expiry dates are kept (they are
+       published years ahead), and dividends up to the next ex-date (AAPL declares them a
+       week or more before).</p>
+  </div>
+  <div>
+    <h3>Data and accounting</h3>
+    <ul class="facts" id="checks"></ul>
+  </div>
+</div>
+<div class="note">
+  <b>Not modelled.</b> Commissions (at $0.65 a contract the PMCC's <span id="nm-fills"></span>
+  option fills cost about <span id="nm-comm"></span>). Fills better or worse than the
+  closing quote — the two-leg orders are assumed to fill at both mids on the same close.
+  Early exercise for any reason other than a dividend. Pin risk at expiry. Taxes.
+  Buying the LEAPS on margin (Reg T allows 75% financing past nine months; this book pays
+  in full). And the choice of AAPL itself: it was picked as a deep, liquid options market,
+  but it is also a stock that rose <span id="nm-move"></span> in the window, which flatters
+  any long-delta book. The comparison between books is the fair test, not the level.
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="records"><span class="n">08</span>Records</h2>
+<h3>Every short call</h3>
+<div class="tablewrap">
+  <table id="t-cycles">
+    <thead><tr>
+      <th class="l">sold</th><th class="l">expiry</th><th>spot</th><th>LEAPS K</th><th>short K</th>
+      <th>OTM</th><th>delta</th><th>premium</th><th>gap rule<br>lifted from</th>
+      <th class="l">outcome</th><th>settle</th><th>short P&amp;L</th><th>LEAPS P&amp;L</th>
+      <th>PMCC</th><th>covered call</th><th class="l">earnings inside</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<p class="tcap">Each row owns the days from the previous call's close to its own, so the
+   PMCC and covered-call columns sum to each book's total P&amp;L
+   (reconciliation gap <span id="recon"></span>).</p>
+
+<h3>Blotter</h3>
+<div class="bar">
+  <button data-flt="all" aria-pressed="true">all</button>
+  <button data-flt="long">LEAPS</button>
+  <button data-flt="short">short calls</button>
+  <button data-flt="ASSIGN">assignments</button>
+  <span class="count" id="blotter-count"></span>
+</div>
+<div class="tablewrap">
+  <table id="t-blotter">
+    <thead><tr>
+      <th class="l">date (close)</th><th class="l">leg</th><th class="l">side</th>
+      <th class="l">contract</th><th>qty</th><th>price</th><th>half-spread</th><th>cash</th>
+      <th class="l">rule</th><th class="l">note</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<h3>Ledger, per unit</h3>
+<div class="bar">
+  <button data-book="pmcc" aria-pressed="true">PMCC</button>
+  <button data-book="cc">covered call</button>
+  <span style="width:14px"></span>
+  <button data-led="month" aria-pressed="true">month-end</button>
+  <button data-led="all">every session</button>
+  <span class="count" id="ledger-count"></span>
+</div>
+<div class="tablewrap">
+  <table id="t-ledger">
+    <thead><tr>
+      <th class="l">date</th><th>AAPL</th><th>shares</th><th class="l">long call</th><th>mark</th>
+      <th class="l">short call</th><th>mark</th><th>cash</th><th>stock MV</th>
+      <th>long MV</th><th>short MV</th><th>P&amp;L (NAV)</th><th>delta (sh.)</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+<p class="tcap">Per-unit view: no opening cash and no interest, so cash goes negative by
+   what the position cost and NAV is cumulative P&amp;L. Marks are closing mids; a session
+   with no two-sided quote carries the last one.</p>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<h2 id="next"><span class="n">09</span>What I would test next</h2>
+<ul class="facts">
+  <li><b>Other stocks and a flat market.</b> One name in one window that rose 85% is one
+      observation. Call-writing is built for sideways markets; this window was mostly a
+      strong uptrend.</li>
+  <li><b>Managing the short call.</b> This book holds every call to expiry, by design, so the
+      rule stays simple. Rolling up and out when a call is tested, or closing at 50% of the
+      premium, are the standard alternatives and the obvious next experiment.</li>
+  <li><b>A shorter long leg when rates are high.</b> The financing charge grows with the
+      rate times the time to expiry. With T-bills at 4–5%, a 6–9 month long carries less of
+      it, at the cost of more frequent rolls and more spread paid.</li>
+  <li><b>Intraday fills.</b> Daily closes cannot show how two legs fill as one order. A year
+      of hourly data exists and would test the mid-fill assumption the way 1.2 did.</li>
+</ul>
+
+<footer>
+  <span id="foot"></span><br>
+  Data from LSEG · fills at the closing mid · delta by Black–Scholes from the mid ·
+  computed in <code>pmcc/book.py</code> and baked into <code>pmcc.js</code>; the page draws,
+  it does not calculate.
+  <pre>git clone https://github.com/yangpuhan/Fintech535 && cd Fintech535
+pip install -r requirements.txt
+python -m pmcc.build      # pmcc/data.pkl -> docs/1.3/pmcc.js   (every number on this page)
+python -m pmcc.fetch      # re-pull from LSEG; needs Workspace running and an app key</pre>
+  <a href="../">Assignment 1.4 · The Wheel</a> ·
+  <a href="../1.2/">Assignment 1.2 · Covered Call</a> ·
+  <a href="../1.1/">Assignment 1.1 · Option Surface Lab</a> ·
+  <a href="https://github.com/yangpuhan/Fintech535">github.com/yangpuhan/Fintech535</a>
+</footer>
+</div>
+
+<script src="pmcc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

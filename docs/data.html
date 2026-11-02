@@ -69,7 +69,8 @@
 <div class="wrap">
 
 <nav>
-  <a href="./">1.3 · Poor Man's Covered Call</a>
+  <a href="./">1.4 · The Wheel</a>
+  <a href="1.3/">1.3 · Poor Man's Covered Call</a>
   <a href="1.2/">1.2 · Covered Call</a>
   <a href="1.1/">1.1 · Option Surface Lab</a>
   <span class="here">Data</span>
@@ -91,9 +92,12 @@
 
 <h2>The cached pulls</h2>
 <p>Everything the published site shows was pulled once from LSEG and baked into a
-   JavaScript file per assignment (<code>pmcc.js</code>, <code>1.2/book.js</code>).
+   JavaScript file per assignment (<code>wheel.js</code>, <code>1.3/pmcc.js</code>,
+   <code>1.2/book.js</code>).
    GitHub Pages serves files and nothing else, so no backtest can be re-run in the
    browser and the tape cannot be refreshed from it.</p>
+<h3 style="font-size:16px;margin:22px 0 8px">1.4 · The Wheel — daily, plus an hourly year for the fill test</h3>
+<table id="prov14"><tbody></tbody></table>
 <h3 style="font-size:16px;margin:22px 0 8px">1.3 · Poor Man's Covered Call — daily</h3>
 <table id="prov13"><tbody></tbody></table>
 <h3 style="font-size:16px;margin:22px 0 8px">1.2 · Covered Call — hourly</h3>
@@ -102,9 +106,25 @@
 <h2>Chain resolution</h2>
 <p>Synthetic RICs name contracts that may never have listed. The hourly endpoint (1.2)
    fails a whole batch on one dead name, so batches bisect on failure; the daily
-   endpoint (1.3) drops dead names silently and returns the rest. Either way the
+   endpoint (1.3, 1.4) drops dead names silently and returns the rest. Either way the
    per-expiry count is kept, so a missing contract is visible. Contracts expiring after
    the pull use the live RIC with no <code>^</code> suffix.</p>
+<h3 style="font-size:16px;margin:22px 0 8px">1.4 — monthly puts and calls, daily</h3>
+<p style="font-size:14.5px;color:#6E6A63">Puts are banded 0.78–1.03 × the stock's range over the
+   weeks one could be sold; calls 0.97–1.45 ×, because the wheel's calls must clear the cost basis
+   of shares bought before a fall. Past 1.15 × the grid is $5, which is what AAPL lists that far out;
+   below that, unresolved $2.50 strikes are ones that never listed.</p>
+<table id="chain14">
+  <thead><tr><th>expiry</th><th class="r">put strikes</th><th class="r">resolved</th>
+    <th class="r">call strikes</th><th class="r">resolved</th></tr></thead>
+  <tbody></tbody>
+</table>
+<h3 style="font-size:16px;margin:22px 0 8px">1.4 — hourly, for the fill test</h3>
+<table id="hchain14">
+  <thead><tr><th>expiry</th><th class="r">puts requested</th><th class="r">resolved</th>
+    <th class="r">calls requested</th><th class="r">resolved</th></tr></thead>
+  <tbody></tbody>
+</table>
 <h3 style="font-size:16px;margin:22px 0 8px">1.3 — monthly short calls and January LEAPS</h3>
 <table id="chain13">
   <thead><tr><th>leg</th><th>expiry</th><th class="r">strikes pulled</th>
@@ -122,8 +142,10 @@
 <p>The fetcher is a tool, not part of the published site. It needs LSEG Workspace
    running and an app key in <code>lseg-data.config.json</code>, which is gitignored
    and never leaves the machine.</p>
-<pre>python -m pmcc.fetch            # LSEG  ->  pmcc/data.pkl
-python -m pmcc.build            # data.pkl  ->  docs/pmcc.js
+<pre>python -m wheel.fetch           # LSEG  ->  wheel/data.pkl
+python -m wheel.build           # data.pkl  ->  docs/wheel.js
+python -m pmcc.fetch            # LSEG  ->  pmcc/data.pkl
+python -m pmcc.build            # data.pkl  ->  docs/1.3/pmcc.js
 python -m covered_call.fetch    # LSEG  ->  covered_call/data.pkl
 python -m covered_call.build    # data.pkl  ->  docs/1.2/book.js
 
@@ -141,18 +163,44 @@ python covered_call/local_server.py
 
 <footer>
   Data from LSEG · <span id="foot"></span><br>
-  <a href="./">Back to 1.3</a> ·
+  <a href="./">Back to 1.4</a> ·
   <a href="https://github.com/yangpuhan/Fintech535">github.com/yangpuhan/Fintech535</a>
 </footer>
 </div>
 
-<script src="pmcc.js"></script>
+<script src="wheel.js"></script>
+<script src="1.3/pmcc.js"></script>
 <script src="1.2/book.js"></script>
 <script>
 'use strict';
 const M = window.BOOK.meta;
 const fmt = n => n.toLocaleString('en-US');
 const Q = window.PMCC.meta;
+const X = window.WHEEL.meta;
+
+document.querySelector('#prov14 tbody').innerHTML = [
+  ['underlying', `${X.ticker} (${X.stock_ric}), rate ${X.rate_ric}`],
+  ['bar size', '1 day — closing quotes for every leg the book trades'],
+  ['window', `${X.first_fill} → ${X.end}, ${fmt(X.sessions)} sessions`],
+  ['option contracts', `${fmt(X.n_contracts)} (standard monthly puts and calls)`],
+  ['daily option quotes', fmt(X.n_option_rows)],
+  ['hourly, fill test', `${fmt(X.n_hourly)} bars on ${X.n_hourly_contracts} out-of-the-money monthlies, Nov 2025 – Oct 2026 (the year LSEG keeps hourly)`],
+  ['also pulled', 'dividends (ex-date, amount), earnings report dates'],
+  ['fetched', X.fetched_at],
+  ['synthetic', X.synthetic ? 'yes' : 'no — a real LSEG pull'],
+].map(([k, v]) => `<tr><td style="color:#6E6A63">${k}</td><td>${v}</td></tr>`).join('');
+
+const byExp = (rows) => {
+  const m = new Map();
+  rows.forEach(c => { const e = String(c.expiry); if (!m.has(e)) m.set(e, {}); m.get(e)[c.right] = c; });
+  return [...m.entries()];
+};
+const cell = c => c ? `<td class="r">${c.lo !== undefined ? c.lo + '–' + c.hi : c.requested}</td>` +
+  `<td class="r">${c.resolved}/${c.requested}</td>` : '<td></td><td></td>';
+document.querySelector('#chain14 tbody').innerHTML = byExp(X.chain).map(([e, r]) =>
+  `<tr><td>${e}</td>${cell(r.P)}${cell(r.C)}</tr>`).join('');
+document.querySelector('#hchain14 tbody').innerHTML = byExp(X.hourly_chain).map(([e, r]) =>
+  `<tr><td>${e}</td>${cell(r.P)}${cell(r.C)}</tr>`).join('');
 
 document.querySelector('#prov13 tbody').innerHTML = [
   ['underlying', `${Q.ticker} (${Q.stock_ric}), rate ${Q.rate_ric}`],
@@ -193,6 +241,7 @@ document.querySelector('#chain tbody').innerHTML = M.chain.map(c => {
 }).join('');
 
 document.getElementById('foot').textContent =
+  `1.4 cached ${X.fetched_at} · ${fmt(X.n_contracts)} contracts · ` +
   `1.3 cached ${Q.fetched_at} · ${fmt(Q.n_contracts)} contracts · ` +
   `1.2 cached ${M.fetched_at} · ${fmt(M.n_contracts)} contracts`;
 
@@ -223,7 +272,7 @@ const onPages = location.protocol === 'https:' || location.hostname.endsWith('gi
     if (j.lseg) {
       set('on', '✓', 'Data connection live',
         `LSEG Workspace is reachable from this machine (${j.session}). ` +
-        '<code>python -m pmcc.fetch</code> will re-pull the tape.');
+        '<code>python -m wheel.fetch</code> will re-pull the tape.');
     } else {
       set('off', '×', 'Data connection required',
         'The local server is running, but LSEG Workspace is not reachable — ' +

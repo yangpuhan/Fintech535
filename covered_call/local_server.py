@@ -67,8 +67,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main() -> None:
-    if not (DOCS / "pmcc.js").exists():
-        raise SystemExit("docs/pmcc.js is missing — run `python -m pmcc.build` first")
+    if not (DOCS / "wheel.js").exists():
+        raise SystemExit("docs/wheel.js is missing — run `python -m wheel.build` first")
     status = workspace_status()
     print(f"serving {DOCS}")
     print(f"  http://{HOST}:{PORT}/            the graded page")
