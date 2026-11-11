@@ -16,6 +16,7 @@ page rather than a new project.
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
 | 1.1 | [`options_surface_lab/`](options_surface_lab/) | [/1.1/](https://yangpuhan.github.io/Fintech535/1.1/) | Expired UUUU option contracts. Listed options are a sparse cloud, not a filled sheet — and the closing mid is not a price anyone paid. |
 |  | — | [/data.html](https://yangpuhan.github.io/Fintech535/data.html) | Provenance, chain resolution, and the live/no-live connection state. |
+|  | [`nightly/`](nightly/) | [/nightly/](https://yangpuhan.github.io/Fintech535/nightly/) | In-class activity: AAPL against SPY, price and 21-day realised volatility, re-queried from LSEG and redrawn by a GitHub Action every weeknight. |
 
 ---
 
@@ -258,8 +259,33 @@ python -m covered_call.fetch
 python -m options_surface_lab.fetch
 ```
 
-The published site never touches LSEG. `docs/data.html` says so, and says it
-out loud on github.io rather than failing quietly.
+The published pages never touch LSEG. `docs/data.html` says so, and says it
+out loud on github.io rather than failing quietly. The one page that changes
+on its own, `/nightly/`, is redrawn by a GitHub Action, not by the browser.
+
+---
+
+## Nightly — the page that redraws itself
+
+An in-class activity: the other pages are pulled once and baked, while
+`/nightly/` is re-queried from LSEG every weeknight and committed back.
+
+```
+.github/workflows/nightly.yml   22:30 UTC Mon-Fri, or "Run workflow" on the Actions tab
+nightly/refresh.py              platform session -> 2 get_history requests (AAPL.O, SPY)
+                                -> docs/nightly/aapl-vol.html (Plotly) + docs/nightly/meta.json
+docs/nightly/index.html         the page: frames the chart, reads meta.json for the tiles
+```
+
+A GitHub runner has no Workspace app, so the workflow opens an LSEG
+*platform* session from three repository secrets: `LSEG_APP_KEY`,
+`LSEG_USERNAME` and `LSEG_PASSWORD`. Run by hand with those unset,
+`python -m nightly.refresh` uses the Workspace desktop session in
+`lseg-data.config.json`. Pages deploys from `main:/docs`, so the bot's commit
+is the deploy. The course server pushes `price_history.json` to the same
+branch every day, so the job rebases before it pushes. The VIX would be the
+natural benchmark, but this account is not permissioned for CBOE indices, so
+SPY stands in.
 
 ---
 

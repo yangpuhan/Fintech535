@@ -3,6 +3,7 @@ pandas==2.3.3
 numpy==2.5.2
 scipy==1.18.1
 
-# Only needed to re-pull from LSEG (options_surface_lab/fetch.py).
-# The published site is static and never imports this.
+# Needed to pull from LSEG: the assignment fetchers (run once, by hand) and
+# nightly/refresh.py (run by .github/workflows/nightly.yml). The published
+# pages never import it.
 lseg-data==2.1.1

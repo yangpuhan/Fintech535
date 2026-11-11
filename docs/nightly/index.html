@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nightly · AAPL vs the Market</title>
+<meta name="description" content="AAPL against SPY, price and 21-day realised volatility, re-queried from LSEG and redrawn by a GitHub Action every weeknight.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;600;700&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper:#FAF8F3; --card:#FFFFFF; --rule:#DDD7CA; --wash:#EFEBE2;
+    --ink:#1A1A1A; --muted:#6E6A63; --faint:#A29D93;
+    --s-aapl:#1D6091; --s-mkt:#C1440E;
+    --serif:'Source Serif 4','Source Serif Pro',Georgia,serif;
+    --mono:'Source Code Pro','SF Mono',Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--serif);
+         -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1000px; margin:0 auto; padding:34px 24px 72px; }
+  nav { display:flex; gap:18px; align-items:baseline; font-family:var(--mono);
+        font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+        color:var(--muted); margin-bottom:26px; flex-wrap:wrap; }
+  nav a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--rule); }
+  nav a:hover { color:var(--ink); border-color:var(--ink); }
+  nav .here { color:var(--ink); font-weight:600; border-bottom:2px solid var(--ink); }
+  .masthead { border-bottom:2px solid var(--ink); padding-bottom:20px; }
+  .kicker { font-family:var(--mono); font-size:11px; color:var(--muted);
+            letter-spacing:.1em; text-transform:uppercase; }
+  h1 { font-size:40px; margin:6px 0 0; font-weight:700; letter-spacing:-.015em; line-height:1.08; }
+  h2 { font-size:21px; margin:44px 0 8px; font-weight:700; }
+  p, li { line-height:1.62; max-width:76ch; }
+  .lede { font-size:17.5px; color:var(--muted); margin:12px 0 0; }
+  a { color:var(--s-aapl); }
+
+  .tiles { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin:26px 0 0; }
+  .tile { background:var(--card); border:1px solid var(--rule); border-radius:4px; padding:14px 16px; }
+  .tile .k { font-family:var(--mono); font-size:10.5px; letter-spacing:.08em;
+             text-transform:uppercase; color:var(--muted); }
+  .tile .v { font-family:var(--mono); font-size:24px; font-weight:600; margin-top:6px;
+             font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .tile .s { font-size:13px; color:var(--muted); margin-top:3px; }
+  .key { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle;
+         margin-right:6px; }
+  .key.aapl { border-color:var(--s-aapl); }
+  .key.mkt { border-color:var(--s-mkt); border-top-style:dotted; border-top-width:3px; }
+
+  .chart { background:var(--card); border:1px solid var(--rule); border-radius:4px;
+           margin:14px 0 0; overflow:hidden; }
+  .chart iframe { display:block; width:100%; height:620px; border:0; }
+  .caption { font-size:14px; color:var(--muted); margin:10px 0 0; }
+
+  ol.cycle { padding-left:22px; margin:8px 0 0; }
+  ol.cycle li { margin:8px 0; }
+  code { font-family:var(--mono); background:var(--wash); padding:1px 5px;
+         border-radius:3px; font-size:.88em; }
+  .note { background:var(--wash); border:1px solid var(--rule); border-radius:4px;
+          padding:15px 18px; font-size:14.5px; color:var(--muted); line-height:1.65;
+          max-width:80ch; margin-top:18px; }
+  .note b { color:var(--ink); }
+  footer { border-top:1px solid var(--ink); margin-top:56px; padding-top:18px;
+           font-family:var(--mono); font-size:12px; color:var(--muted); line-height:1.8; }
+  footer a { color:var(--muted); }
+  @media (max-width:760px) {
+    .wrap { padding:24px 16px 56px; }
+    h1 { font-size:30px; }
+    .tiles { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .tile .v { font-size:20px; }
+    .chart iframe { height:540px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a href="../">1.4 · The Wheel</a>
+  <a href="../1.3/">1.3 · Poor Man's Covered Call</a>
+  <a href="../1.2/">1.2 · Covered Call</a>
+  <a href="../1.1/">1.1 · Option Surface Lab</a>
+  <a href="../data.html">Data</a>
+  <span class="here">Nightly</span>
+  <a href="https://github.com/yangpuhan/Fintech535">Source</a>
+</nav>
+
+<div class="masthead">
+  <div class="kicker">MENG FinTech · Algorithmic Trading II · In-class activity</div>
+  <h1>AAPL against the market, redrawn every weeknight</h1>
+  <p class="lede">An option seller on AAPL is paid for how much AAPL moves. This chart
+  tracks that against the market (SPY), and nobody redraws it by hand: after the US close
+  a GitHub Action queries LSEG, rebuilds the chart and commits it to this site.</p>
+</div>
+
+<div class="tiles">
+  <div class="tile">
+    <div class="k">AAPL close</div>
+    <div class="v" data-k="aapl_close">—</div>
+    <div class="s" data-k="through">loading…</div>
+  </div>
+  <div class="tile">
+    <div class="k"><span class="key aapl"></span>AAPL 21-day vol</div>
+    <div class="v" data-k="aapl_rv">—</div>
+    <div class="s">realised, annualised</div>
+  </div>
+  <div class="tile">
+    <div class="k"><span class="key mkt"></span>SPY 21-day vol</div>
+    <div class="v" data-k="spy_rv">—</div>
+    <div class="s">realised, annualised</div>
+  </div>
+  <div class="tile">
+    <div class="k">Last refreshed</div>
+    <div class="v" data-k="when">—</div>
+    <div class="s" data-k="who">&nbsp;</div>
+  </div>
+</div>
+
+<div class="chart">
+  <iframe src="aapl-vol.html" title="AAPL and SPY: price rebased to 100, and 21-day realised volatility"></iframe>
+</div>
+<p class="caption">Top: closing prices, both rebased to 100 on the first session shown.
+Bottom: 21-day close-to-close realised volatility, annualised. Hover for values; drag
+across the chart to zoom, double-click to reset.</p>
+
+<h2>How this page updates</h2>
+<ol class="cycle">
+  <li><b>Trigger.</b> <a href="https://github.com/yangpuhan/Fintech535/actions/workflows/nightly.yml">The
+    Nightly LSEG refresh workflow</a> (<code>.github/workflows/nightly.yml</code>) runs at
+    22:30 UTC Monday to Friday, after the US close, or whenever <i>Run workflow</i> is
+    pressed on that page.</li>
+  <li><b>Query.</b> On a GitHub-hosted Ubuntu runner,
+    <a href="https://github.com/yangpuhan/Fintech535/blob/main/nightly/refresh.py"><code>nightly/refresh.py</code></a>
+    opens an LSEG platform session from three repository secrets and makes two
+    <code>get_history</code> requests: daily closes for <code>AAPL.O</code> and
+    <code>SPY</code>, about fifteen months of each.</li>
+  <li><b>Write.</b> It draws the Plotly figure to <code>docs/nightly/aapl-vol.html</code>
+    and the numbers in the tiles to <code>docs/nightly/meta.json</code>.</li>
+  <li><b>Publish.</b> The workflow commits those two files to <code>main</code>. GitHub
+    Pages republishes <code>docs/</code>, and the frame above loads the new chart.</li>
+</ol>
+<p>If LSEG refuses the login or returns no data, the script stops before it writes
+anything. The site keeps the last good chart, and the run shows red on the Actions page.</p>
+
+<h2>Definitions</h2>
+<p>Realised volatility is the standard deviation of daily log returns,
+ln(P<sub>t</sub>/P<sub>t−1</sub>), over the last 21 sessions, times √252, in percent.
+Only completed sessions count: a run before 16:15 New York time drops that day's
+still-forming bar. Prices are LSEG <code>TRDPRC_1</code> daily closes, not adjusted
+for dividends.</p>
+<p class="note"><b>Why SPY and not the VIX.</b> The natural yardstick for an option
+seller is implied volatility, but this LSEG account is not permissioned for CBOE
+indices (<code>.VIX</code> comes back "User has no permission"). SPY's realised
+volatility is how much the market itself moved. The gap between the two lines is how
+much more AAPL moves than the market, from its beta and its own news together. It is not
+a variance premium, which would need AAPL's implied volatility.</p>
+
+<footer>
+  Data: LSEG, through the lseg-data Python library, platform session ·
+  <a href="https://github.com/yangpuhan/Fintech535/blob/main/nightly/refresh.py">nightly/refresh.py</a> ·
+  <a href="https://github.com/yangpuhan/Fintech535/actions/workflows/nightly.yml">workflow runs</a><br>
+  <a href="../">Back to 1.4</a> ·
+  <a href="https://github.com/yangpuhan/Fintech535">github.com/yangpuhan/Fintech535</a>
+</footer>
+
+</div>
+<script>
+(function () {
+  var MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function set(k, text) {
+    document.querySelectorAll('[data-k="' + k + '"]').forEach(function (el) { el.textContent = text; });
+  }
+  function day(iso) {            // "2026-11-10" -> "10 Nov 2026", no timezone shift
+    var p = iso.split("-");
+    return +p[2] + " " + MON[+p[1] - 1] + " " + p[0];
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  fetch("meta.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (m) {
+      set("aapl_close", "$" + m.aapl_close.toFixed(2));
+      set("aapl_rv", m.aapl_rv.toFixed(1) + "%");
+      set("spy_rv", m.spy_rv.toFixed(1) + "%");
+      set("through", "close of " + day(m.through));
+      var t = new Date(m.generated_utc);
+      set("when", t.getUTCDate() + " " + MON[t.getUTCMonth()] + " " + t.getUTCFullYear());
+      var who = document.querySelector('[data-k="who"]');
+      var at = pad(t.getUTCHours()) + ":" + pad(t.getUTCMinutes()) + " UTC · ";
+      if (m.run) {
+        who.textContent = at;
+        var a = document.createElement("a");
+        a.href = m.run.url;
+        a.textContent = "Actions run #" + m.run.number;
+        who.appendChild(a);
+      } else {
+        who.textContent = at + "run by hand (" +
+          (m.session === "desktop" ? "Workspace session" : "platform session") + ")";
+      }
+    })
+    .catch(function (e) {
+      set("through", "meta.json not available");
+      set("when", "—");
+      set("who", String(e.message || e));
+    });
+})();
+</script>
+</body>
+</html>
