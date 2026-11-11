@@ -89,8 +89,8 @@
   <div class="kicker">MENG FinTech · Algorithmic Trading II · In-class activity</div>
   <h1>AAPL against the market, redrawn every weeknight</h1>
   <p class="lede">An option seller on AAPL is paid for how much AAPL moves. This chart
-  tracks that against the market (SPY), and nobody redraws it by hand: after the US close
-  a GitHub Action queries LSEG, rebuilds the chart and commits it to this site.</p>
+  tracks that against the market (SPY), and nobody redraws it by hand: overnight after
+  each session a GitHub Action queries LSEG, rebuilds the chart and commits it to this site.</p>
 </div>
 
 <div class="tiles">
@@ -127,8 +127,8 @@ across the chart to zoom, double-click to reset.</p>
 <ol class="cycle">
   <li><b>Trigger.</b> <a href="https://github.com/yangpuhan/Fintech535/actions/workflows/nightly.yml">The
     Nightly LSEG refresh workflow</a> (<code>.github/workflows/nightly.yml</code>) runs at
-    22:30 UTC Monday to Friday, after the US close, or whenever <i>Run workflow</i> is
-    pressed on that page.</li>
+    08:00 UTC Tuesday to Saturday (3 a.m. in New York, so every weekday session is
+    covered), or whenever <i>Run workflow</i> is pressed on that page.</li>
   <li><b>Query.</b> On a GitHub-hosted Ubuntu runner,
     <a href="https://github.com/yangpuhan/Fintech535/blob/main/nightly/refresh.py"><code>nightly/refresh.py</code></a>
     opens an LSEG platform session from three repository secrets and makes two
@@ -140,7 +140,10 @@ across the chart to zoom, double-click to reset.</p>
     Pages republishes <code>docs/</code>, and the frame above loads the new chart.</li>
 </ol>
 <p>If LSEG refuses the login or returns no data, the script stops before it writes
-anything. The site keeps the last good chart, and the run shows red on the Actions page.</p>
+anything. The site keeps the last good chart, and the run shows red on the Actions page.
+The usual cause is the clock: this LSEG account allows one sign-in at a time, and the job
+does not take over a Workspace session that is open, so it runs in the small hours, when
+Workspace is normally closed.</p>
 
 <h2>Definitions</h2>
 <p>Realised volatility is the standard deviation of daily log returns,

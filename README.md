@@ -271,7 +271,7 @@ An in-class activity: the other pages are pulled once and baked, while
 `/nightly/` is re-queried from LSEG every weeknight and committed back.
 
 ```
-.github/workflows/nightly.yml   22:30 UTC Mon-Fri, or "Run workflow" on the Actions tab
+.github/workflows/nightly.yml   08:00 UTC Tue-Sat, or "Run workflow" on the Actions tab
 nightly/refresh.py              platform session -> 2 get_history requests (AAPL.O, SPY)
                                 -> docs/nightly/aapl-vol.html (Plotly) + docs/nightly/meta.json
 docs/nightly/index.html         the page: frames the chart, reads meta.json for the tiles
@@ -283,7 +283,10 @@ A GitHub runner has no Workspace app, so the workflow opens an LSEG
 `python -m nightly.refresh` uses the Workspace desktop session in
 `lseg-data.config.json`. Pages deploys from `main:/docs`, so the bot's commit
 is the deploy. The course server pushes `price_history.json` to the same
-branch every day, so the job rebases before it pushes. The VIX would be the
+branch every day, so the job rebases before it pushes. The account allows one
+LSEG sign-in at a time and the job does not take over an open Workspace
+(`signon_control=False`; `True` logs Workspace out), so it runs at 3am New
+York time; a run that meets an open Workspace fails and leaves the last chart. The VIX would be the
 natural benchmark, but this account is not permissioned for CBOE indices, so
 SPY stands in.
 

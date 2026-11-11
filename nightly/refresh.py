@@ -83,8 +83,9 @@ def open_session(ld):
                    else ld.open_session())
         kind = "desktop"
     if session.open_state != ld.OpenState.Opened:
-        hint = ("check the three secrets, and that this LSEG account may sign in "
-                "to the Data Platform" if kind == "platform"
+        hint = ("this account allows one sign-in at a time, so an open Workspace "
+                "blocks this login; otherwise check the three secrets"
+                if kind == "platform"
                 else "is LSEG Workspace running and signed in?")
         raise RuntimeError(f"LSEG {kind} session did not open ({hint})")
     print(f"LSEG {kind} session opened")

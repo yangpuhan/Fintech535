@@ -7,8 +7,10 @@ name: Nightly LSEG refresh
 on:
   workflow_dispatch:        # the "Run workflow" button on the Actions tab
   schedule:
-    # 22:30 UTC Mon-Fri = 5:30pm EST / 6:30pm EDT, after the US close.
-    - cron: "30 22 * * 1-5"
+    # 08:00 UTC Tue-Sat = 3am EST / 4am EDT, the morning after each weekday
+    # session. The LSEG account allows one sign-in at a time and this job
+    # will not take over an open Workspace, so it runs when that is closed.
+    - cron: "0 8 * * 2-6"
 
 concurrency:
   group: nightly-refresh
