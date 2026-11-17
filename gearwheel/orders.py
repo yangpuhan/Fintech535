@@ -336,7 +336,16 @@ def pull_chain(ld, right: str, expiry: dt.date, S: float, floor: float | None,
     if got.empty:
         return got
     got["date"] = pd.DatetimeIndex(got["date"]).normalize()
+    # Open interest is published the morning after (OCC), so at night the
+    # last session's row has none yet. Use each contract's latest reported
+    # figure inside the pulled week: what was knowable at the decision.
+    oi_col = got["OPINT_1"] if "OPINT_1" in got else pd.Series(np.nan, index=got.index)
+    got["OPINT_1"] = pd.to_numeric(oi_col, errors="coerce").astype(float)
+    last_oi = (got.dropna(subset=["OPINT_1"]).sort_values("date")
+               .groupby("ric").tail(1).set_index("ric"))
     got = got[got["date"].dt.date == decided].copy()
+    got["OPINT_1"] = got["ric"].map(last_oi["OPINT_1"]) if len(last_oi) else np.nan
+    got["oi_date"] = got["ric"].map(last_oi["date"].dt.date) if len(last_oi) else None
     got["strike"] = got["ric"].map(rics)
     for c in ("BID", "ASK", "OPINT_1"):
         # LSEG hands back nullable dtypes; plain floats keep NaN tests simple
@@ -350,8 +359,10 @@ def pull_chain(ld, right: str, expiry: dt.date, S: float, floor: float | None,
     got["iv"] = implied_vol(got["mid"], S, got["strike"], T, r, q, is_call)
     got["delta"] = bs_delta(S, got["strike"], T, r, q, got["iv"], is_call)
     got = got.dropna(subset=["delta"]).sort_values("strike").reset_index(drop=True)
+    od = got["oi_date"].dropna() if "oi_date" in got else pd.Series(dtype=object)
     print(f"chain {right} {expiry}: {len(got)} two-sided quotes on {decided}, "
-          f"{int(got['OPINT_1'].notna().sum())} with open interest")
+          f"{int(got['OPINT_1'].notna().sum())} with open interest"
+          f"{f' (as of {min(od)} to {max(od)})' if len(od) else ''}")
     return got
 
 
