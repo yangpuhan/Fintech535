@@ -69,7 +69,9 @@ def fetch(names=None, save: bool = False, tries: int = 3) -> dict[str, pd.Series
         url = URLS[name]
         for i in range(tries):
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (research script)"})
+                # FRED stalls a request with no Accept header until it times out
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (research script)",
+                                                           "Accept": "*/*"})
                 with urllib.request.urlopen(req, timeout=45) as r:
                     text = r.read().decode("utf-8")
                 break
