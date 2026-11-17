@@ -1,15 +1,13 @@
 [
   {
     "decided": "2026-11-16",
-    "for": "2026-11-17",
+    "for": "2026-11-18",
     "gear": "wheel",
     "close": 352.78,
     "sma": 301.72,
     "rv": 27.1,
     "rv_median": 22.7,
-    "orders": [
-      "aapl-sht-p-20261218-340-2026-11-17"
-    ],
-    "why": "flat: sell 2 2026-12-18 340 put (delta -0.29, IV 26.4%, last mid 5.22), secured by $68,000"
+    "orders": [],
+    "why": "stale: the last close is 2026-11-16, but 2026-11-18 follows 2026-11-17, which Sanji has not resolved yet. No new orders this run."
   }
 ]
