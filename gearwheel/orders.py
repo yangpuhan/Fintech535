@@ -1,5 +1,10 @@
 """
-Tonight's orders: the gear wheel, written in Sanji.
+Tonight's orders: the crossed wheel, written in Sanji.
+
+The rule is the one gearwheel/lab.py selected from 36 crossings of the
+course's parts: 1.4's wheel + the earnings blackout + the open-interest
+strike. (The package keeps its first hypothesis's name, the gear, which the
+lab rejected; its signals are still computed and published.)
 
     python -m gearwheel.orders              # pull, decide, write the files
     python -m gearwheel.orders --dry-run    # pull, decide, print; write nothing
@@ -22,8 +27,8 @@ Outputs
     docs/gear/state.json   tonight's signals, book, decision and orders
     docs/gear/log.json     one row per decision date: the forward record
 
-The rule is wheel.book.run with gearwheel.signals' gear, decided on the last
-close, as in the backtest. Three things differ, all because Sanji is not the
+The rule is wheel.book.run with the lab's switches (earnings=both sides,
+oi_wall=True), decided on the last close, as in the backtest. Three things differ, all because Sanji is not the
 backtest's tape: a fill is at the open or inside the day's range, not on the
 close; a profit-take closes tonight and the next put or call is sold the
 night after (the backtest rolls on one close); and the strike is chosen from

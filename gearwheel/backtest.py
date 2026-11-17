@@ -44,6 +44,7 @@ KAPPA = 0.57            # 1.4's measured share of the half-spread given up
 SPLIT = dt.date(2025, 9, 30)
 
 VARIANTS = {
+    "winner":      dict(label="wheel + earnings + OI strike", kw={"earn": True, "oi": True}),
     "wheel":       dict(label="1.4 wheel", kw={}),
     "wheel_earn":  dict(label="wheel + earnings", kw={"earn": True}),
     "gear_a":      dict(label="gear A (hold buys)", kw={"gear": True, "hold_buys": True}),
@@ -75,7 +76,8 @@ def run_variant(m: Market, raw: dict, key: str, gm: dict | None = None):
     return run(m, p,
                gear=(gm if gm is not None else gear_map(signal_px(raw))) if kw.get("gear") else None,
                earnings=raw["earnings"] if kw.get("earn") else None,
-               hold_buys=kw.get("hold_buys", True))
+               hold_buys=kw.get("hold_buys", True),
+               oi_wall=kw.get("oi", False))
 
 
 def _window(m, led: pd.DataFrame, a: dt.date | None, b: dt.date | None, spot=None) -> dict:
@@ -109,7 +111,24 @@ def lookahead(raw: dict, full, key: str, dates: list[dt.date]) -> list[dict]:
     return out
 
 
-def build(live: str = "gear_b") -> dict:
+def earnings_pnl(m: Market, raw: dict, r) -> list[dict]:
+    """1.4's wheel, its shorts split by whether their life spanned a report."""
+    reports = sorted({pd.Timestamp(e).date() for e in raw["earnings"]})
+    out = {}
+    for s in r.shorts:
+        end = s["closed"] or s["expiry"]
+        spans = any(s["opened"] < e < end for e in reports)
+        k = (spans, s["right"])
+        o = out.setdefault(k, {"spans": spans, "right": s["right"], "n": 0, "pnl": 0.0,
+                               "contracts": 0, "assigned": 0})
+        o["n"] += 1
+        o["pnl"] += s["pnl"]
+        o["contracts"] += s["qty"]
+        o["assigned"] += s["outcome"] in ("ASSIGNED", "CALLED", "EARLY")
+    return [dict(v, pnl=round(v["pnl"], 2)) for _, v in sorted(out.items())]
+
+
+def build(live: str = "winner") -> dict:
     raw = load()
     m = Market(raw)
     spot = pd.Series(m.px)
@@ -157,7 +176,8 @@ def build(live: str = "gear_b") -> dict:
                  "live_days_shares_no_call": ran},
         "lookahead": la,
         "dates": [str(d) for d in leds["wheel"]["date"]],
-        "nav": {k: series(leds[k]) for k in ("wheel", live, "gear_a", "hold", "tbills")},
+        "nav": {k: series(leds[k]) for k in ("wheel", live, "hold", "tbills")},
+        "earnings_pnl": earnings_pnl(m, raw, runs["wheel"]),
         "timeline": {"close": [round(float(x), 2) for x in g["close"]],
                      "sma": [None if not np.isfinite(x) else round(float(x), 2) for x in g["sma"]],
                      "rv": [None if not np.isfinite(x) else round(float(x), 1) for x in g["rv"]],

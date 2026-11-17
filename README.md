@@ -11,12 +11,54 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| 1.4 | [`wheel/`](wheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
+| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The crossed wheel: a nightly GitHub Action that writes AAPL orders in Sanji to `open_orders.json`. The rule — 1.4's wheel + an earnings blackout + the open-interest strike — was picked from 36 crossings of the course's parts by a selection rule fixed before the run. |
+| 1.4 | [`wheel/`](wheel/) | [/1.4/](https://yangpuhan.github.io/Fintech535/1.4/) | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
 | 1.3 | [`pmcc/`](pmcc/) | [/1.3/](https://yangpuhan.github.io/Fintech535/1.3/) | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
 | 1.1 | [`options_surface_lab/`](options_surface_lab/) | [/1.1/](https://yangpuhan.github.io/Fintech535/1.1/) | Expired UUUU option contracts. Listed options are a sparse cloud, not a filled sheet — and the closing mid is not a price anyone paid. |
 |  | — | [/data.html](https://yangpuhan.github.io/Fintech535/data.html) | Provenance, chain resolution, and the live/no-live connection state. |
 |  | [`nightly/`](nightly/) | [/nightly/](https://yangpuhan.github.io/Fintech535/nightly/) | In-class activity: AAPL against SPY, price and 21-day realised volatility, re-queried from LSEG and redrawn by a GitHub Action every weeknight. |
+
+---
+
+## Final — The Crossed Wheel
+
+An algorithm is a function from inputs to open orders. This one runs every
+weeknight: `.github/workflows/nightly.yml` (03:00 UTC, retried 08:00 UTC)
+opens an LSEG platform session from repository secrets, and
+`gearwheel/orders.py` reads Sanji's book (`mkt/positions.json`; absent, the
+opening $100,000), decides, and writes the next session's orders in Sanji to
+`mkt/open_orders.json` and `open_orders.json`. The bot's commit republishes
+the page, which reads `docs/gear/*.json`.
+
+```
+gearwheel/
+  backfill.py   1.4's tape carried from 30 Sep 2025 to the last session  ->  data.pkl
+  signals.py    the trend/vol gear (the first hypothesis; rejected by the lab)
+  lab.py        36 crossings of four course parts on 1.4's engine, and the
+                selection rule  ->  docs/gear/lab.json
+  backtest.py   the winner in detail, look-ahead test  ->  docs/gear/backtest.json
+  orders.py     tonight's decision  ->  open_orders.json, mkt/open_orders.json,
+                docs/gear/state.json, docs/gear/log.json
+```
+
+The parts, each a switch on `wheel.book.run` (off by default, so 1.4 is
+unchanged): an earnings blackout (1.2), the gear (in-class realised vol;
+1.2-1.4 on calls), sell only when IV >= realised vol (1.4), and the strike
+with the most open interest in 0.20-0.40 |delta| (this week's OI clusters).
+The rule, fixed before the run: rank on 1.4's window (Jan 2022 - Sep 2025)
+by Sharpe; of the top five, the first that beats 1.4's wheel on the new tape
+(Oct 2025 on) and in 6 of 9 delta x fill robustness cells. It picked
+**1.4's wheel + earnings blackout + OI strike**: 18.13% a year, Sharpe 0.76,
+against the wheel's 14.71% and 0.63; +34.1% on the new tape against +20.2%.
+The gear and the IV filter lost almost everywhere.
+
+```bash
+python -m gearwheel.backfill          # needs LSEG Workspace
+python -m gearwheel.lab
+python -m gearwheel.backtest
+python -m gearwheel.orders --dry-run  # Workspace locally, or the platform secrets
+```
 
 ---
 
