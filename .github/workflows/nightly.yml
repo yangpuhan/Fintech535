@@ -1,15 +1,26 @@
 name: Nightly LSEG refresh
 
-# Query LSEG -> redraw docs/nightly/aapl-vol.html -> commit -> Pages republishes.
-# Pages here deploys from main:/docs, so the commit alone republishes the site;
-# no separate deploy workflow is needed.
+# Query LSEG -> redraw docs/nightly/aapl-vol.html -> decide tomorrow's orders
+# (gearwheel/orders.py -> open_orders.json, mkt/open_orders.json) -> commit
+# -> Pages republishes. Pages here deploys from main:/docs, so the commit
+# alone republishes the site; no separate deploy workflow is needed.
 
 on:
   workflow_dispatch:        # the "Run workflow" button on the Actions tab
+    inputs:
+      dry_run:
+        description: "Decide and print the orders, but commit nothing"
+        type: boolean
+        default: false
   schedule:
-    # 08:00 UTC Tue-Sat = 3am EST / 4am EDT, the morning after each weekday
-    # session. The LSEG account allows one sign-in at a time and this job
-    # will not take over an open Workspace, so it runs when that is closed.
+    # 03:00 UTC Tue-Sat = 10pm EST / 11pm EDT, after each weekday session:
+    # the instructor's time, and the run that plans the next session.
+    - cron: "0 3 * * 2-6"
+    # 08:00 UTC = 3am EST, the retry. The LSEG account allows one sign-in at
+    # a time and this job will not take over an open Workspace, so if the
+    # evening run met one, this one tries again. GitHub starts scheduled runs
+    # late (hours, on this repo); a run that starts after the open does not
+    # plan the next session off a stale book (orders.py checks).
     - cron: "0 8 * * 2-6"
 
 concurrency:
@@ -22,7 +33,11 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      LSEG_APP_KEY: ${{ secrets.LSEG_APP_KEY }}
+      LSEG_USERNAME: ${{ secrets.LSEG_USERNAME }}
+      LSEG_PASSWORD: ${{ secrets.LSEG_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -40,22 +55,27 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Query LSEG and redraw the chart
-        env:
-          LSEG_APP_KEY: ${{ secrets.LSEG_APP_KEY }}
-          LSEG_USERNAME: ${{ secrets.LSEG_USERNAME }}
-          LSEG_PASSWORD: ${{ secrets.LSEG_PASSWORD }}
+        id: chart
+        continue-on-error: true     # the orders do not depend on the chart
         run: python -m nightly.refresh
 
+      - name: Decide tomorrow's orders (the gear wheel)
+        id: orders
+        run: python -m gearwheel.orders ${{ inputs.dry_run && '--dry-run' || '' }}
+
       - name: Commit and push
+        if: ${{ !inputs.dry_run && !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/nightly/aapl-vol.html docs/nightly/meta.json
+          git add docs/nightly/aapl-vol.html docs/nightly/meta.json \
+                  open_orders.json mkt/open_orders.json docs/gear/state.json docs/gear/log.json \
+                  2>/dev/null || true
           if git diff --cached --quiet; then
-            echo "chart unchanged; nothing to commit"
+            echo "nothing changed; nothing to commit"
             exit 0
           fi
-          git commit -m "Nightly refresh: AAPL vs SPY through $(jq -r .through docs/nightly/meta.json)"
+          git commit -m "Nightly: orders for $(jq -r .for docs/gear/state.json 2>/dev/null || echo '?'), chart through $(jq -r .through docs/nightly/meta.json)"
           # The course server also pushes price_history.json to main, so replay
           # this commit on top of anything that landed while the job ran.
           git pull --rebase origin main

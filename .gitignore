@@ -31,3 +31,6 @@ option_pipeline_data.pkl
 # Reflex build artifacts (no longer used)
 .web/
 reflex.lock/
+
+# Resumable fetch cache (gearwheel/backfill.py)
+gearwheel/.cache/

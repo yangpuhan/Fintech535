@@ -280,16 +280,31 @@ def _pick(g: pd.DataFrame, target: float):
     return g.iloc[i]
 
 
-def select_put(m: Market, d: dt.date, p: Params, after: dt.date | None = None):
+# The Final Cycle's open-interest strike (today's in-class OI clusters): among
+# strikes whose |delta| is inside this band, the one with the most open
+# interest on the decision close; ties go to the strike nearest the target.
+OI_BAND = (0.20, 0.40)
+
+
+def _pick_oi(g: pd.DataFrame, target: float):
+    a = g["delta"].abs()
+    band = g[(a >= OI_BAND[0]) & (a <= OI_BAND[1]) & g["OPINT_1"].notna()]
+    if band.empty:
+        return _pick(g, target)
+    return _pick(band[band["OPINT_1"] == band["OPINT_1"].max()], target)
+
+
+def select_put(m: Market, d: dt.date, p: Params, after: dt.date | None = None,
+               oi: bool = False):
     exp = first_expiry(m, d, p, after)
     g = m.chain.get((d, exp, "P"))
     if g is None or g.empty:
         return None
-    return _pick(g, -p.put_delta)
+    return (_pick_oi if oi else _pick)(g, -p.put_delta)
 
 
 def select_call(m: Market, d: dt.date, p: Params, floor: float | None,
-                after: dt.date | None = None):
+                after: dt.date | None = None, oi: bool = False):
     """(pick, free): the rule's call, and the one it would be without the basis floor."""
     exp = first_expiry(m, d, p, after)
     g = m.chain.get((d, exp, "C"))
@@ -300,11 +315,48 @@ def select_call(m: Market, d: dt.date, p: Params, floor: float | None,
         g = g[g["strike"] >= floor - 1e-9]
         if g.empty:
             return None, free
-    return _pick(g, p.call_delta), free
+    return (_pick_oi if oi else _pick)(g, p.call_delta), free
 
 
-def run(m: Market, p: Params = HEADLINE, opening: float = OPENING) -> Run:
+def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
+        gear: dict | None = None, earnings: list | None = None,
+        hold_buys: bool = True, earn_side: str = "both",
+        iv_rv: dict | None = None, oi_wall: bool = False) -> Run:
+    """
+    ``gear`` and ``earnings`` are the Final Cycle's two additions (gearwheel/),
+    both off by default, so 1.4's runs are unchanged:
+
+    gear       {session: "hold" | "wheel"}, decided on that session's close.
+               "hold" sells no new options: flat, it buys the round lots the
+               cash buys at the next close; long, it lets the shares run. An
+               option already open runs to expiry (a profit-take still closes
+               it, with no roll). "wheel" is 1.4's rule. Wheel mode only.
+               hold_buys=False: flat in "hold" still sells the put (shares
+               only ever arrive by assignment); "hold" then only means no
+               calls on shares already owned.
+    earnings   report dates. No new short whose life spans one: the order is
+               skipped and decided again the next session. earn_side="calls"
+               applies it to calls only.
+    iv_rv      {session: realised vol, decimal}. Sell only when the chosen
+               contract's implied vol is at least that (1.4: the put was
+               priced above realised vol in 32 of 43 months); else wait.
+    oi_wall    pick the strike by open interest inside OI_BAND, not by
+               nearest delta.
+    """
     res = Run(params=p)
+    shift = gear is not None and p.mode == "wheel"
+    reports = sorted({(e.date() if hasattr(e, "date") else e) for e in (earnings or [])})
+
+    def blocked(d, expiry, right="P") -> bool:
+        if earn_side == "calls" and right == "P":
+            return False
+        return any(d < e < expiry for e in reports)
+
+    def rich(d, pk) -> bool:
+        if iv_rv is None:
+            return True
+        rv, iv = iv_rv.get(d), float(pk["iv"])
+        return rv is None or not np.isfinite(rv) or not np.isfinite(iv) or iv >= rv
     cash = opening
     shares = 0
     basis: float | None = None     # per share, wheel lots only
@@ -336,6 +388,20 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING) -> Run:
     def decide(d) -> dict:
         """Tomorrow's order, from today's close only."""
         order = {"decided": d}
+        if shift and gear.get(d, "wheel") == "hold" and (
+                hold_buys or shares > 0 or (short is not None and short.right == "C")):
+            order["gear"] = "hold"
+            if short is None and shares == 0:
+                n = int(cash // (CONTRACT * m.px[d]))
+                if n > 0:
+                    order["buy_stock"] = n * CONTRACT
+            elif short is not None and p.take is not None:
+                mk = m.mid(d, short.ric)
+                q = m.quote.get((d, short.ric))
+                if mk is not None and q is not None and np.isfinite(q[0]) and \
+                        mk <= (1 - p.take) * short.premium:
+                    order["close"] = short.ric
+            return order
         if stock_mode and shares == 0 and short is None:
             S = m.px[d]
             n = int(cash // (CONTRACT * S))
@@ -356,18 +422,18 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING) -> Run:
             return order
         after = short.expiry if "close" in order else None
         if shares == 0:
-            pick = select_put(m, d, p, after)
+            pick = select_put(m, d, p, after, oi=oi_wall)
             if pick is not None:
                 spend = 0.0
                 if "close" in order:
                     spend = m.mid(d, short.ric) * CONTRACT * short.qty
                 n = int((cash - spend) // (CONTRACT * float(pick["strike"])))
-                if n > 0:
+                if n > 0 and not blocked(d, pick["expiry"], "P") and rich(d, pick):
                     order["open"] = ("P", pick, None, n)
         else:
             floor = basis if (p.basis_rule and p.mode == "wheel") else None
-            pick, free = select_call(m, d, p, floor, after)
-            if pick is not None:
+            pick, free = select_call(m, d, p, floor, after, oi=oi_wall)
+            if pick is not None and not blocked(d, pick["expiry"], "C") and rich(d, pick):
                 order["open"] = ("C", pick, free, shares // CONTRACT)
             else:
                 order["uncovered"] = True
@@ -401,10 +467,21 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING) -> Run:
             if n_sh:
                 shares = n_sh
                 cash -= n_sh * S
-                book(d, "BUY", "AAPL.O", None, None, None, n_sh, S, None, None,
-                     "STOCK", "buy-write: round lots the cash buys, at the close", -n_sh * S)
+                if order.get("gear") == "hold":
+                    basis = S
+                    lot = {"opened": d, "strike": S, "shares": n_sh, "put_premium": 0.0,
+                           "spot": S, "calls": 0, "calls_net": 0.0, "dividends": 0.0,
+                           "put_id": None, "bought": True}
+                    book(d, "BUY", "AAPL.O", None, None, None, n_sh, S, None, None,
+                         "GEAR", f"hold gear (calm uptrend at the {dec} close): "
+                         "round lots the cash buys, at the close", -n_sh * S)
+                else:
+                    book(d, "BUY", "AAPL.O", None, None, None, n_sh, S, None, None,
+                         "STOCK", "buy-write: round lots the cash buys, at the close",
+                         -n_sh * S)
                 res.first_fill = res.first_fill or d
-                order["open"] = order["open"][:3] + (n_sh // CONTRACT,)
+                if "open" in order:
+                    order["open"] = order["open"][:3] + (n_sh // CONTRACT,)
             else:
                 order.pop("open", None)
         rolled = False
@@ -578,6 +655,7 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING) -> Run:
             "phase": ("put" if short and short.right == "P" else
                       "call" if short else "shares" if shares else "cash"),
             "uncovered": bool(shares and short is None),
+            **({"gear": gear.get(d, "wheel")} if shift else {}),
         })
 
         # ---- 4. tonight's decision ---------------------------------------

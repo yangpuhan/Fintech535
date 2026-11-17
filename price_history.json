@@ -277,5 +277,10 @@
         "volume": 11133942.0
       }
     }
+  },
+  "265598": {
+    "tracked": true,
+    "name": "APPLE INC",
+    "price_history": {}
   }
 }
