@@ -1,0 +1,15 @@
+[
+  {
+    "id": "aapl-sht-p-20261218-340-2026-11-17",
+    "for": "2026-11-17",
+    "order_type": "lmt",
+    "action": "SHT",
+    "qty": 2,
+    "underlying": 265598,
+    "contract": "put",
+    "expiry": "2026-12-18",
+    "strike": 340,
+    "ref": "open",
+    "lmt_prc": "mid"
+  }
+]
