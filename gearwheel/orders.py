@@ -81,6 +81,11 @@ HOLD_BUYS = False
 USE_GEAR = False
 EARNINGS_BLACKOUT = True
 OI_STRIKE = True
+# The second lab (gearwheel/lab2.py), ideas from outside the course, added one
+# part by the same kind of rule: no new put while the Baa-Treasury spread
+# (FRED) is above its 200-day average. If FRED cannot be read, no new put:
+# a risk control that cannot be checked is treated as on.
+CREDIT_PAUSE = True
 HISTORY_DAYS = 800             # calendar days of closes: 200 + 252 + 21 sessions, padded
 OPEN_NY = dt.time(9, 30)
 
@@ -288,8 +293,15 @@ def pull_market(ld, now_ny: dt.datetime) -> dict:
         print(f"warning: dividends not read ({e}); q = {q}")
 
     earn, estimated = next_earnings(ld, decided)
+    credit = {"stress": None}
+    if CREDIT_PAUSE:
+        from .external import credit_now, fetch
+        try:
+            credit = credit_now(fetch(["BAA10Y"])["BAA10Y"], decided)
+        except Exception as e:
+            credit = {"stress": None, "error": f"FRED BAA10Y not read: {e}"}
     return {"px": px, "decided": decided, "r": r, "q": q,
-            "earnings": earn, "earnings_estimated": estimated}
+            "earnings": earn, "earnings_estimated": estimated, "credit": credit}
 
 
 def next_earnings(ld, after: dt.date) -> tuple[dt.date | None, bool]:
@@ -424,6 +436,7 @@ def decide(mkt: dict, book: Book, now_ny: dt.datetime, ld=None) -> dict:
                     "short": ({**book.short, "expiry": book.short["expiry"].isoformat()}
                               if book.short else None),
                     "basis": book.basis, "premium": book.premium},
+           "credit": mkt.get("credit"),
            "pick": None, "orders": [], "why": []}
     why = out["why"]
 
@@ -480,6 +493,18 @@ def decide(mkt: dict, book: Book, now_ny: dt.datetime, ld=None) -> dict:
         why.append(f"earnings {mkt['earnings']} fall inside the {expiry} expiry: "
                    "no new short tonight")
         return out
+    if book.shares == 0 and CREDIT_PAUSE:
+        cr = mkt.get("credit") or {}
+        if cr.get("stress") is None:
+            why.append(f"credit signal unavailable ({cr.get('error', 'not enough history')}): "
+                       "no new put tonight")
+            return out
+        if cr["stress"]:
+            why.append(f"credit pause: Baa-Treasury spread {cr['baa']:.2f} (as of {cr['asof']}) is "
+                       f"above its 200-day average {cr['baa_ma']:.2f}: no new put tonight")
+            return out
+        why.append(f"credit calm: Baa-Treasury spread {cr['baa']:.2f} (as of {cr['asof']}) is "
+                   f"below its 200-day average {cr['baa_ma']:.2f}")
     if ld is None:
         why.append("no LSEG session: chain not read")
         return out

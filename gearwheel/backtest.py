@@ -44,7 +44,8 @@ KAPPA = 0.57            # 1.4's measured share of the half-spread given up
 SPLIT = dt.date(2025, 9, 30)
 
 VARIANTS = {
-    "winner":      dict(label="wheel + earnings + OI strike", kw={"earn": True, "oi": True}),
+    "winner":      dict(label="wheel + earnings + OI + credit", kw={"earn": True, "oi": True, "credit": True}),
+    "lab1":        dict(label="wheel + earnings + OI strike", kw={"earn": True, "oi": True}),
     "wheel":       dict(label="1.4 wheel", kw={}),
     "wheel_earn":  dict(label="wheel + earnings", kw={"earn": True}),
     "gear_a":      dict(label="gear A (hold buys)", kw={"gear": True, "hold_buys": True}),
@@ -77,7 +78,13 @@ def run_variant(m: Market, raw: dict, key: str, gm: dict | None = None):
                gear=(gm if gm is not None else gear_map(signal_px(raw))) if kw.get("gear") else None,
                earnings=raw["earnings"] if kw.get("earn") else None,
                hold_buys=kw.get("hold_buys", True),
-               oi_wall=kw.get("oi", False))
+               oi_wall=kw.get("oi", False),
+               pause=_credit_pause(m) if kw.get("credit") else None)
+
+
+def _credit_pause(m: Market) -> dict:
+    from . import external as ex
+    return ex.pause_map(ex.snapshot(), m.calendar, use_vix=False, use_credit=True)
 
 
 def _window(m, led: pd.DataFrame, a: dt.date | None, b: dt.date | None, spot=None) -> dict:
@@ -176,7 +183,7 @@ def build(live: str = "winner") -> dict:
                  "live_days_shares_no_call": ran},
         "lookahead": la,
         "dates": [str(d) for d in leds["wheel"]["date"]],
-        "nav": {k: series(leds[k]) for k in ("wheel", live, "hold", "tbills")},
+        "nav": {k: series(leds[k]) for k in ("wheel", live, "lab1", "hold", "tbills")},
         "earnings_pnl": earnings_pnl(m, raw, runs["wheel"]),
         "timeline": {"close": [round(float(x), 2) for x in g["close"]],
                      "sma": [None if not np.isfinite(x) else round(float(x), 2) for x in g["sma"]],

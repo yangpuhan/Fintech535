@@ -1,6 +1,7 @@
 /* The Crossed Wheel page. Reads four files the pipeline writes and draws
    them; it never calculates a result itself.
      gear/lab.json       python -m gearwheel.lab       (by hand, once)
+     gear/lab2.json      python -m gearwheel.lab2      (by hand, once)
      gear/backtest.json  python -m gearwheel.backtest  (by hand, once)
      gear/state.json     python -m gearwheel.orders    (the Action, nightly)
      gear/log.json       the same, one row appended per decision            */
@@ -52,6 +53,9 @@
         pk ? `${esc(pk.expiry)} · delta ${num(pk.delta)} · OI ${pk.oi == null ? '—' : pk.oi.toLocaleString('en-US')}` : 'no contract chosen tonight'],
       ['Next report', esc(e.next || '—'), e.estimated ? 'estimated (last + 91 days); blackout widened 10 days' : 'from LSEG'],
       ['AAPL close', num(s.close), `21-day vol ${num(s.rv, 1)}%`],
+      ['Credit', st.credit && st.credit.stress === false ? 'calm' : st.credit && st.credit.stress ? 'pause' : '—',
+        st.credit && st.credit.baa != null ? `Baa–Treasury ${num(st.credit.baa)} vs 200-day ${num(st.credit.baa_ma)} (${esc(st.credit.asof)})`
+          : esc((st.credit && st.credit.error) || 'not read')],
       ['Book', st.book && st.book.shares ? `${st.book.shares} sh` : money(st.book && st.book.cash),
         esc(st.book ? st.book.source : '')],
     ];
@@ -130,6 +134,46 @@
         num(s.full.sharpe), pct(s.full.max_dd_pct), pct(s.new.ret_pct)] })));
   }
 
+
+  // ── the second lab ───────────────────────────────────────────────────
+  function lab2(L) {
+    const st = (r, w, k) => r.stats[w][k];
+    $('lab2-table').innerHTML = table(
+      ['#', 'candidate', '1.4 window Sharpe', 'new tape Sharpe', 'return', 'full CAGR', 'Sharpe', 'max DD', 'idle'],
+      L.rows.map((r) => ({
+        cls: r.key === L.winner ? 'hl' : '',
+        cells: [r.rank_found, esc(r.label) + (r.key === L.winner ? ' · <b>winner</b>' : r.key === L.live ? ' · bar to beat' : ''),
+          num(st(r, 'found', 'sharpe')), num(st(r, 'new', 'sharpe')), pct(st(r, 'new', 'ret_pct')),
+          pct(st(r, 'full', 'cagr_pct'), 2), num(st(r, 'full', 'sharpe')), pct(st(r, 'full', 'max_dd_pct')),
+          r.idle_pct.toFixed(0) + '%'] })),
+      { left: [1] });
+    const live = L.rows.find((r) => r.key === L.live);
+    $('finalists2').innerHTML = table(
+      ['#', 'finalist', '1.4 window Sharpe', 'new tape Sharpe', 'vs live', 'robust cells won', 'verdict'],
+      L.finalists.map((f) => ({
+        cls: f.key === L.winner ? 'hl' : '',
+        cells: [f.rank_found, esc(f.label), num(f.found_sharpe), num(f.new_sharpe),
+          `${num(live.stats.new.sharpe)} → ${f.beats_new ? '<span class="pass">beats</span>' : '<span class="fail">no</span>'}`,
+          `${f.robust_wins} / 9`, f.passes ? '<span class="pass">PASS</span>' : '<span class="fail">fail</span>'] })),
+      { left: [1] });
+    const w = L.rows.find((r) => r.key === L.winner);
+    const top = L.finalists[0];
+    $('verdict2').innerHTML = L.winner === L.live
+      ? '<b>No finalist cleared the bar; the first lab\'s rule stays.</b>'
+      : `<b>The rule picks ${esc(L.winner_label)}.</b> Against the rule it replaces: Sharpe ` +
+        `${num(live.stats.full.sharpe)} → ${num(w.stats.full.sharpe)}, max drawdown ${pct(live.stats.full.max_dd_pct)} → ` +
+        `${pct(w.stats.full.max_dd_pct)}, new-tape Sharpe ${num(live.stats.new.sharpe)} → ${num(w.stats.new.sharpe)} — ` +
+        `bought with return (CAGR ${pct(live.stats.full.cagr_pct, 2)} → ${pct(w.stats.full.cagr_pct, 2)}) and time in cash ` +
+        `(${live.idle_pct.toFixed(0)}% → ${w.idle_pct.toFixed(0)}% of sessions), which is what a risk control should cost. ` +
+        (top.key !== L.winner ? `The rule also earned its keep: the best candidate on 1.4's window, ${esc(top.label)} ` +
+          `(Sharpe ${num(top.found_sharpe)}), fell to ${num(top.new_sharpe)} on the new tape and won ${top.robust_wins} of 9 ` +
+          `robustness cells — a backtest-only winner, caught.` : '');
+    const names = { vix: 'VIX pause', credit: 'credit pause', size: 'vol sizing', defend: 'defend roll' };
+    $('effects2').innerHTML = table(['part', 'Δ Sharpe, 1.4 window', 'helps', 'Δ Sharpe, new tape', 'helps', 'Δ max DD, full'],
+      Object.entries(L.effects).map(([k, x]) => ({ cells: [esc(names[k] || k), signed(x.found, 3),
+        `${x.helps_found} / ${x.of}`, signed(x.new, 3), `${x.helps_new} / ${x.of}`, signed(x.mdd_full, 1) + ' pts'] })));
+  }
+
   // ── the winner ───────────────────────────────────────────────────────
   const AX = { showgrid: true, gridcolor: '#EFEBE2', zeroline: false, showline: false, ticks: '',
     tickfont: { family: MONO, size: 11, color: '#6E6A63' } };
@@ -171,7 +215,7 @@
   }
 
   function years(bt) {
-    const keys = [bt.live, 'wheel', 'putwrite', 'buywrite', 'hold'];
+    const keys = [bt.live, 'lab1', 'wheel', 'putwrite', 'buywrite', 'hold'].filter((k) => bt.stats[k]);
     const ys = Object.keys(bt.stats.wheel.full.years);
     const best = {};
     ys.forEach((y) => { best[y] = Math.max(...keys.map((k) => bt.stats[k].full.years[y])); });
@@ -218,6 +262,7 @@
   }
 
   get('gear/lab.json').then(lab).catch((e) => { $('lab-cap').textContent = 'Could not load the lab: ' + e.message; });
+  get('gear/lab2.json').then(lab2).catch((e) => { $('verdict2').textContent = 'Could not load the second lab: ' + e.message; });
   get('gear/backtest.json').then((bt) => { prov(bt); navChart(bt); years(bt); earn(bt); lookahead(bt); })
     .catch((e) => { $('years-cap').textContent = 'Could not load the backtest: ' + e.message; });
   get('gear/state.json', true).then(tonight)

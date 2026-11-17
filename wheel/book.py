@@ -321,7 +321,9 @@ def select_call(m: Market, d: dt.date, p: Params, floor: float | None,
 def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
         gear: dict | None = None, earnings: list | None = None,
         hold_buys: bool = True, earn_side: str = "both",
-        iv_rv: dict | None = None, oi_wall: bool = False) -> Run:
+        iv_rv: dict | None = None, oi_wall: bool = False,
+        pause: dict | None = None, size_scale: dict | None = None,
+        defend: float | None = None) -> Run:
     """
     ``gear`` and ``earnings`` are the Final Cycle's two additions (gearwheel/),
     both off by default, so 1.4's runs are unchanged:
@@ -342,6 +344,15 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
                priced above realised vol in 32 of 43 months); else wait.
     oi_wall    pick the strike by open interest inside OI_BAND, not by
                nearest delta.
+    pause      {session: True} on days no new put may be sold (a market-
+               stress signal from outside the stock). Calls are not paused:
+               a covered call only lowers risk.
+    size_scale {session: 0..1}: the put count is scaled by it (vol-managed
+               sizing). Calls stay one per 100 shares.
+    defend     roll a short put down and out once its delta reaches -defend
+               (deep in the money) instead of waiting for assignment: buy it
+               back, and sell the next put by the usual rule on a later
+               expiry.
     """
     res = Run(params=p)
     shift = gear is not None and p.mode == "wheel"
@@ -418,6 +429,14 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
                     mk <= (1 - p.take) * short.premium:
                 order["close"] = short.ric
                 flat_after = True
+        if (short is not None and "close" not in order and defend is not None
+                and short.right == "P" and short.expiry > d):
+            dl = m.mark_d(d, short.ric)
+            q = m.quote.get((d, short.ric))
+            if dl is not None and dl <= -defend and q is not None and np.isfinite(q[0]):
+                order["close"] = short.ric
+                order["defend"] = True
+                flat_after = True
         if not flat_after:
             return order
         after = short.expiry if "close" in order else None
@@ -427,8 +446,10 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
                 spend = 0.0
                 if "close" in order:
                     spend = m.mid(d, short.ric) * CONTRACT * short.qty
-                n = int((cash - spend) // (CONTRACT * float(pick["strike"])))
-                if n > 0 and not blocked(d, pick["expiry"], "P") and rich(d, pick):
+                scale = 1.0 if size_scale is None else float(size_scale.get(d, 1.0))
+                n = int(scale * (cash - spend) // (CONTRACT * float(pick["strike"])))
+                if (n > 0 and not blocked(d, pick["expiry"], "P") and rich(d, pick)
+                        and not (pause or {}).get(d, False)):
                     order["open"] = ("P", pick, None, n)
         else:
             floor = basis if (p.basis_rule and p.mode == "wheel") else None
@@ -492,11 +513,14 @@ def run(m: Market, p: Params = HEADLINE, opening: float = OPENING,
                 cost = px_ * CONTRACT * short.qty
                 cash -= cost
                 rolling = "open" in order
+                why_close = (f"delta reached -{defend:.2f} at the {dec} close: roll down and out"
+                             if order.get("defend") else
+                             f"mid {m.mid(dec, short.ric):.2f} at the {dec} close <= "
+                             f"{(1 - p.take) * 100:.0f}% of the {short.premium:.2f} premium")
                 book(d, "BUY TO CLOSE", short.ric, short.right, short.strike, short.expiry,
-                     +short.qty, px_, mid_, half_, "ROLL" if rolling else "CLOSE",
-                     f"mid {m.mid(dec, short.ric):.2f} at the {dec} close <= "
-                     f"{(1 - p.take) * 100:.0f}% of the {short.premium:.2f} premium",
-                     -cost)
+                     +short.qty, px_, mid_, half_,
+                     "DEFEND" if order.get("defend") else "ROLL" if rolling else "CLOSE",
+                     why_close, -cost)
                 if lot is not None and short.right == "C":
                     lot["calls_net"] -= px_
                     basis += px_

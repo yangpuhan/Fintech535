@@ -11,7 +11,7 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The crossed wheel: a nightly GitHub Action that writes AAPL orders in Sanji to `open_orders.json`. The rule — 1.4's wheel + an earnings blackout + the open-interest strike — was picked from 36 crossings of the course's parts by a selection rule fixed before the run. |
+| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The crossed wheel: a nightly GitHub Action that writes AAPL orders in Sanji to `open_orders.json`. The rule — 1.4's wheel + an earnings blackout + the open-interest strike + a credit-stress pause — was picked in two labs (36 course crossings, 48 outside ones) by selection rules fixed before each run. |
 | 1.4 | [`wheel/`](wheel/) | [/1.4/](https://yangpuhan.github.io/Fintech535/1.4/) | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
 | 1.3 | [`pmcc/`](pmcc/) | [/1.3/](https://yangpuhan.github.io/Fintech535/1.3/) | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
@@ -53,9 +53,19 @@ by Sharpe; of the top five, the first that beats 1.4's wheel on the new tape
 against the wheel's 14.71% and 0.63; +34.1% on the new tape against +20.2%.
 The gear and the IV filter lost almost everywhere.
 
+A second lab (`lab2.py`) took that winner as the bar and added parts from
+outside the course: a VIX term-structure pause (CBOE), a credit pause (FRED
+`BAA10Y` above its 200-day average), volatility-managed sizing (Moreira &
+Muir 2017), and a defensive roll at delta -0.70. 48 candidates, judged on
+Sharpe by a rule fixed in advance. It added the **credit pause**: Sharpe
+0.76 -> 0.80, max drawdown -27.0% -> -23.9%, new-tape Sharpe 1.78 -> 1.82,
+for a lower CAGR (16.09%). That is what trades now. The external series are
+snapshotted in `gearwheel/ext/` and fetched fresh each night.
+
 ```bash
 python -m gearwheel.backfill          # needs LSEG Workspace
 python -m gearwheel.lab
+python -m gearwheel.lab2
 python -m gearwheel.backtest
 python -m gearwheel.orders --dry-run  # Workspace locally, or the platform secrets
 ```
