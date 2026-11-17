@@ -185,7 +185,7 @@ def page(underlying: str) -> str:
 <div class="wrap">
 
   <nav>
-    <a href="../">Final · The Crossed Wheel</a>
+    <a href="../">Final · The Nightly Wheel</a>
     <a href="../1.4/">1.4 · The Wheel</a>
     <a href="../1.3/">1.3 · Poor Man's Covered Call</a>
     <a href="../1.2/">1.2 · Covered Call</a>

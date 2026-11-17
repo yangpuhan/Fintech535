@@ -44,8 +44,7 @@ KAPPA = 0.57            # 1.4's measured share of the half-spread given up
 SPLIT = dt.date(2025, 9, 30)
 
 VARIANTS = {
-    "winner":      dict(label="wheel + earnings + OI + credit", kw={"earn": True, "oi": True, "credit": True}),
-    "lab1":        dict(label="wheel + earnings + OI strike", kw={"earn": True, "oi": True}),
+    "winner":      dict(label="the nightly wheel", kw={"earn": True, "credit": True}),
     "wheel":       dict(label="1.4 wheel", kw={}),
     "wheel_earn":  dict(label="wheel + earnings", kw={"earn": True}),
     "gear_a":      dict(label="gear A (hold buys)", kw={"gear": True, "hold_buys": True}),
@@ -148,7 +147,8 @@ def build(live: str = "winner") -> dict:
               "hold": "buy & hold", "tbills": "T-bills"}
 
     windows = {"full": (None, None), "found": (None, SPLIT),
-               "new": (SPLIT + dt.timedelta(days=1), None)}
+               "new": (SPLIT + dt.timedelta(days=1), None),
+               "since2023": (dt.date(2023, 1, 1), None)}
     stats = {k: {w: _window(m, led, a, b) for w, (a, b) in windows.items()}
              for k, led in leds.items()}
 
@@ -183,7 +183,7 @@ def build(live: str = "winner") -> dict:
                  "live_days_shares_no_call": ran},
         "lookahead": la,
         "dates": [str(d) for d in leds["wheel"]["date"]],
-        "nav": {k: series(leds[k]) for k in ("wheel", live, "lab1", "hold", "tbills")},
+        "nav": {k: series(leds[k]) for k in ("wheel", live, "hold", "tbills")},
         "earnings_pnl": earnings_pnl(m, raw, runs["wheel"]),
         "timeline": {"close": [round(float(x), 2) for x in g["close"]],
                      "sma": [None if not np.isfinite(x) else round(float(x), 2) for x in g["sma"]],

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Crossed Wheel · AAPL</title>
-<meta name="description" content="Final Cycle: a nightly GitHub Action that pulls AAPL from LSEG and FRED, reads Sanji's book and writes tomorrow's orders to open_orders.json. 1.4's wheel with an earnings blackout, the open-interest strike and a credit-stress pause, chosen in two labs by rules fixed in advance.">
+<title>The Nightly Wheel · AAPL</title>
+<meta name="description" content="Final Cycle: a GitHub Action runs every weeknight, pulls AAPL from LSEG and a credit spread from FRED, reads Sanji's book, and writes the next session's orders to open_orders.json: 1.4's wheel with an earnings blackout and a credit-stress pause.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Code+Pro:wght@400;600;700&display=swap">
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
@@ -15,7 +15,7 @@
     --paper:#FAF8F3; --card:#FFFFFF; --rule:#DDD7CA; --wash:#EFEBE2;
     --ink:#1A1A1A; --muted:#6E6A63; --faint:#A29D93;
 
-    /* Series. Moss is the crossed wheel (this page's algorithm), vermilion is
+    /* Series. Moss is the nightly wheel (this page's algorithm), vermilion is
        1.4's wheel, blue is the stock. Validated together on the white plot
        surface (all pairs, CVD and normal vision); every series also carries
        a dash pattern and a direct end-label. T-bills are a grey reference. */
@@ -171,7 +171,7 @@
 <div class="wrap">
 
 <nav>
-  <span class="here">Final · The Crossed Wheel</span>
+  <span class="here">Final · The Nightly Wheel</span>
   <a href="1.4/">1.4 · The Wheel</a>
   <a href="1.3/">1.3 · Poor Man's Covered Call</a>
   <a href="1.2/">1.2 · Covered Call</a>
@@ -183,14 +183,12 @@
 
 <div class="masthead">
   <div class="kicker">MENG FinTech · Algorithmic Trading II · Final Cycle</div>
-  <h1>The Crossed Wheel</h1>
-  <p class="lede">An algorithm is a function that takes inputs and returns open orders.
-    This one runs every weeknight on GitHub Actions: it pulls AAPL from LSEG, reads the book
-    Sanji wrote, and writes the next session's orders to <code>open_orders.json</code> in Sanji.
-    The body is <b>1.4's wheel</b>. Two parts come from elsewhere in the course —
-    <b>1.2's lesson about earnings</b> and <b>this week's open-interest clusters</b> — and one
-    from outside it: <b>a pause while US corporate credit is getting worse</b>. They were
-    chosen in two labs, 36 and 48 crossings, each by a selection rule written down before it ran.</p>
+  <h1>The Nightly Wheel</h1>
+  <p class="lede">An algorithm is a function that takes inputs and returns open orders. Every
+    weeknight a GitHub Action pulls AAPL from LSEG and a credit spread from FRED, reads the book
+    Sanji wrote, and writes the next session's orders to <code>open_orders.json</code>. The rule is
+    <b>1.4's wheel</b> with two changes: <b>no new option across an earnings report</b>, and
+    <b>no new put while corporate credit is getting worse</b>.</p>
   <p class="prov" id="prov">Loading…</p>
 </div>
 
@@ -204,246 +202,112 @@
   <p class="tcap" id="tonight-cap"></p>
 </section>
 
-<h2 id="loop"><span class="n">01</span>The loop</h2>
-<p class="blurb">Five steps, two machines, one file each way. GitHub runs the strategy; the
-  course server, Luffy, runs Sanji. The strategy never talks to a broker: it reads the book
-  and writes orders, and Sanji decides what filled.</p>
+<h2 id="algo"><span class="n">01</span>The algorithm</h2>
+<p class="blurb">Decided on the last close, every night, from the book Sanji wrote (until he
+  writes one, the opening book: $100,000 cash).</p>
+<div class="rules">
+  <div class="rule"><div class="tag">Wheel</div><div class="body"><b>Cash:</b> sell cash-secured puts
+    on the first monthly expiry at least 21 days out, at the strike nearest −0.30 delta, as many as
+    the cash secures. <b>Assigned:</b> own the shares; cost basis = strike − premium. <b>Shares:</b>
+    sell one call per 100 shares, same expiry rule, nearest +0.30 delta among strikes at or above the
+    basis. <b>Called away:</b> back to cash. <em>Unused cash, including what secures a put, earns
+    T-bill interest.</em></div></div>
+  <div class="rule"><div class="tag">Profit-take</div><div class="body">Buy a short back once it costs
+    half what it was sold for; sell the next one the night after.</div></div>
+  <div class="rule"><div class="tag">Earnings</div><div class="body">No new put or call whose life
+    spans Apple's next report date. <em>Reports gap the stock overnight; in 1.4's wheel the calls held
+    through one lost $25,103.</em></div></div>
+  <div class="rule"><div class="tag">Credit</div><div class="body">No new put while the Baa–Treasury
+    spread (Moody's Baa corporate yield less the 10-year Treasury, from FRED) is above its 200-day
+    average. <em>A widening spread means lenders are getting nervous about companies, which tends to
+    come before equity selloffs. Calls are not paused — a covered call only lowers risk.</em></div></div>
+  <div class="rule"><div class="tag">Delta</div><div class="body">Computed from each contract's last
+    closing quote (Black-Scholes, 1.3/1.4's <code>greeks.py</code>), because Sanji does not accept
+    <code>delta:30</code> yet. The chosen strike goes to Sanji as a number, with a dated expiry.</div></div>
+</div>
+
+<h2 id="why"><span class="n">02</span>Why this algorithm</h2>
+<ul class="facts">
+  <li><b>The wheel was the semester's best result.</b> In 1.4 it beat buying the stock on
+    risk-adjusted return, and the reason was timing: the put buys AAPL only after a fall, and the
+    basis rule holds it through the rebound.</li>
+  <li><b>Its losses had a pattern.</b> 1.2's worst week was a call sold the day before Apple reported;
+    across 1.4's wheel, the calls held through a report lost $25,103, the worst of any group of its
+    trades.</li>
+  <li><b>What I kept, and what I didn't.</b> On 1.4's engine and data carried to November 2026 I tested
+    eight additions — the two rules above, a trend/volatility switch, an implied-vs-realised vol filter,
+    an open-interest strike, a VIX pause, volatility sizing and a defensive roll — each on 1.4's
+    original window and again on the data since October 2025. The earnings blackout made the clearest
+    difference; the credit pause added a smaller gain in risk-adjusted return (Sharpe 0.79 → 0.83).
+    The rest hurt or did little, and were left out.</li>
+</ul>
+
+<h3>Against 1.4's wheel and against simply holding AAPL</h3>
+<div class="tablewrap" id="compare"></div>
+<p class="tcap" id="compare-cap"></p>
+<div class="legend" id="nav-legend" style="margin-top:16px"></div>
+<div class="panel"><div id="chart-nav" style="height:400px"></div></div>
+<div class="note" id="honest"></div>
+
+<h2 id="how"><span class="n">03</span>How it works</h2>
+<p class="blurb">Five steps, two machines. GitHub runs the strategy; the course server, Luffy,
+  runs Sanji. The strategy never talks to a broker: it reads the book and writes orders.</p>
 <div class="loop">
   <div class="step"><div class="who">GitHub Actions · 22:00 ET</div>
     <div class="what">The schedule fires</div>
-    <div class="how"><code>.github/workflows/nightly.yml</code>, Tue–Sat 03:00 UTC, retried at 08:00 UTC.
-      LSEG credentials are repository secrets.</div></div>
-  <div class="step"><div class="who">LSEG platform session</div>
+    <div class="how"><code>.github/workflows/nightly.yml</code>, Tue–Sat 03:00 UTC, retried at
+      08:00 UTC. LSEG credentials are repository secrets.</div></div>
+  <div class="step"><div class="who">LSEG · FRED</div>
     <div class="what">Inputs</div>
-    <div class="how">LSEG: AAPL.O closes, the 3-month T-bill, dividends, the next report
-      date, the last close's quotes and open interest on one monthly expiry. FRED: the
-      Baa–Treasury spread.</div></div>
+    <div class="how">AAPL closes, the T-bill, dividends, the next report date, the last close's
+      option quotes; the Baa–Treasury spread.</div></div>
   <div class="step"><div class="who"><code>gearwheel/orders.py</code></div>
     <div class="what">Book → rule → orders</div>
-    <div class="how">Read the book, apply the rule, translate the decision into Sanji:
-      action, contract, expiry, strike, limit.</div></div>
+    <div class="how">Read the book, apply the rule, write the decision in Sanji's order
+      language.</div></div>
   <div class="step"><div class="who">git commit</div>
     <div class="what">The open orders</div>
-    <div class="how"><code>mkt/open_orders.json</code> (where Sanji reads), the same array at
-      the root, and this page's <code>docs/gear/*.json</code>. The commit republishes the site.</div></div>
+    <div class="how"><code>mkt/open_orders.json</code> (where Sanji reads) and the same array at the
+      root. The commit republishes this page.</div></div>
   <div class="step"><div class="who">Sanji, on Luffy</div>
     <div class="what">Fills and the book</div>
-    <div class="how">After the session: resolve each order against the prices in Robin,
-      apply assignment at the close, write <code>fills.json</code> and
-      <code>positions.json</code>.</div></div>
+    <div class="how">After the session: fill the orders, apply assignment, write
+      <code>fills.json</code> and <code>positions.json</code>.</div></div>
 </div>
-<p class="loopback">↺ The next night starts from the book Sanji wrote. Until Sanji resolves
-  orders, the book is the opening one: $100,000 cash.</p>
+<p class="loopback">↺ The next night starts from the book Sanji wrote.</p>
 
-<h2 id="parts"><span class="n">02</span>The parts from the course</h2>
-<p class="blurb">Four assignments left four findings that each suggest a change to the
-  wheel. Each became a switch on 1.4's engine, so every combination runs on the same tape,
-  chain, deltas, profit-take and measured fill — only the switch differs.</p>
-<div class="tablewrap">
-<table>
-  <thead><tr><th class="l">Part</th><th class="l">Where it comes from</th><th class="l">What it changes</th><th class="l">Settings</th></tr></thead>
-  <tbody>
-    <tr><td class="l"><b>Earnings blackout</b></td><td class="wrapcell">1.2: on 31 July the rule sold a call at double its usual premium the day before Apple reported, and the shares lost $2,916 the next morning.</td>
-      <td class="wrapcell">No new short whose life spans a report date; decide again the next night.</td><td class="l">none · both sides · calls only</td></tr>
-    <tr><td class="l"><b>Gear</b></td><td class="wrapcell">The in-class realised-vol pipeline, and 1.2–1.4: short calls capped every rally (1.3's 57 calls lost $5,019 while AAPL rose 85%).</td>
-      <td class="wrapcell">In a calm uptrend (close above its 200-day average, 21-day vol at or below its 1-year median) stop writing calls on shares; A also buys the shares when flat.</td><td class="l">off · B · A</td></tr>
-    <tr><td class="l"><b>IV over RV</b></td><td class="wrapcell">1.4: the 0.30-delta put was priced above realised vol in 32 of 43 months.</td>
-      <td class="wrapcell">Sell only when the chosen contract's implied vol is at least the 21-day realised vol.</td><td class="l">off · on</td></tr>
-    <tr><td class="l"><b>OI strike</b></td><td class="wrapcell">This week's OI clusters: open interest piles up at a few strikes.</td>
-      <td class="wrapcell">Among strikes between 0.20 and 0.40 |delta|, sell the one with the most open interest (ties to the nearest 0.30).</td><td class="l">off · on</td></tr>
-  </tbody>
-</table>
-</div>
-<p class="tcap">3 × 3 × 2 × 2 = 36 candidates; the all-off one is 1.4's wheel. Controls run beside them:
-  put-write, buy-write, puts-then-hold (sell puts until assigned, then never write a call), buy &amp; hold, T-bills.</p>
-
-<h2 id="lab"><span class="n">03</span>The first lab: crossing the course</h2>
-<p class="blurb">The danger in crossing 36 things is picking the luckiest. So the choice was
-  made by a rule fixed in <code>gearwheel/lab.py</code> before it ran:</p>
-<ol class="steps">
-  <li>Rank all 36 by Sharpe on <b>1.4's window only</b> (3 Jan 2022 – 30 Sep 2025).</li>
-  <li>Take the top five. Each must (a) beat 1.4's wheel on the <b>new tape</b> (1 Oct 2025 on,
-    pulled after every part was written), and (b) beat it in at least <b>6 of 9</b> robustness
-    cells — delta 0.25 / 0.30 / 0.35 × fill k 0.30 / 0.57 / 0.80, full-period Sharpe.</li>
-  <li>The winner is the highest-ranked finalist that passes both. If none does, the answer is 1.4's wheel.</li>
-</ol>
-<div class="note"><b>Disclosure.</b> Two parts — the both-sides blackout and the gear — had
-  already been run on the new tape before the lab existed (they were the first hypothesis).
-  The rule ranks on 1.4's window, so that look could not move the ranking; it did influence
-  which parts entered the lab.</div>
-
-<h3>All 36, ranked on 1.4's window</h3>
-<div class="tablewrap" id="lab-table" style="max-height:440px"></div>
-<p class="tcap" id="lab-cap"></p>
-
-<h3>The finalists</h3>
-<div class="tablewrap" id="finalists"></div>
-<div class="verdict" id="verdict"></div>
-
-<h3>What each part does on its own</h3>
-<p class="blurb">For each part, every pair of candidates that differ only in that part:
-  the average change in Sharpe it causes, and in how many pairs it helps.</p>
-<div class="tablewrap" id="effects"></div>
-<p class="tcap">Why the gear loses: under the put-entry version (B) shares only arrive after a
-  fall, when the market is rarely a calm uptrend, so the gear almost never acts; the buying
-  version (A) acts — and buys after rallies, the opposite of the wheel's edge.</p>
-
-<h3>The controls</h3>
-<div class="tablewrap" id="controls" style="max-width:820px"></div>
-
-<h2 id="lab2"><span class="n">04</span>The second lab: beyond the course</h2>
-<p class="blurb">The first lab's winner became the base; the new parts come from outside the
-  syllabus — two market-stress signals from public data, a sizing rule from the academic
-  literature, and a habit from options desks. Same engine, same tape, same discipline.</p>
-<div class="tablewrap">
-<table>
-  <thead><tr><th class="l">Part</th><th class="l">Where it comes from</th><th class="l">What it changes</th><th class="l">Data</th></tr></thead>
-  <tbody>
-    <tr><td class="l"><b>VIX pause</b></td><td class="wrapcell">When one month of S&amp;P protection costs more than three months (VIX above VIX3M), the market is in stress — the curve inverts in selloffs.</td>
-      <td class="wrapcell">No new put while the VIX term structure is inverted.</td><td class="l">CBOE, free daily history</td></tr>
-    <tr><td class="l"><b>Credit pause</b></td><td class="wrapcell">Credit markets tend to sour before equity markets break: a widening corporate spread is an early warning.</td>
-      <td class="wrapcell">No new put while the Baa–Treasury spread is above its 200-day average (yesterday's value: FRED posts a day late).</td><td class="l">FRED <code>BAA10Y</code></td></tr>
-    <tr><td class="l"><b>Vol sizing</b></td><td class="wrapcell">Moreira &amp; Muir (2017), volatility-managed portfolios: cut exposure when volatility is high.</td>
-      <td class="wrapcell">Put count × min(1, the stock's 1-year median 21-day vol ÷ today's).</td><td class="l">LSEG closes</td></tr>
-    <tr><td class="l"><b>Defend roll</b></td><td class="wrapcell">A desk habit: don't take assignment, roll the threatened put down and out.</td>
-      <td class="wrapcell">At delta −0.70, buy the put back and sell the next one on a later expiry.</td><td class="l">the option tape</td></tr>
-  </tbody>
-</table>
-</div>
-<p class="tcap">Three bases (1.4's wheel; + earnings; + earnings + OI, the first lab's winner) × 2⁴ = 48
-  candidates. The VIX was not available from LSEG on this account and FRED now serves only three years
-  of the high-yield spread, hence CBOE and the Baa series.</p>
-<p class="blurb" style="margin-top:18px">The rule, fixed in <code>gearwheel/lab2.py</code> before it
-  ran. These parts are mostly risk controls, so it judges on <b>Sharpe</b>, and the bar is the rule
-  already trading:</p>
-<ol class="steps">
-  <li>Rank all 48 by Sharpe on 1.4's window.</li>
-  <li>Of the top five, each must beat the first lab's winner on <b>new-tape Sharpe</b> and on
-    full-period Sharpe in at least <b>6 of 9</b> robustness cells.</li>
-  <li>The highest-ranked finalist that passes replaces it; if none does, nothing changes.</li>
-</ol>
-<h3>All 48, ranked on 1.4's window</h3>
-<div class="tablewrap" id="lab2-table" style="max-height:440px"></div>
-<h3>The finalists</h3>
-<div class="tablewrap" id="finalists2"></div>
-<div class="verdict" id="verdict2"></div>
-<h3>What each new part does on its own</h3>
-<div class="tablewrap" id="effects2"></div>
-<p class="tcap">Max-DD change: positive means a shallower drawdown. The defend roll is the cleanest
-  negative result in either lab: refusing assignment does cut the drawdown, by about 11 points, but
-  it takes most of the return with it — it throws away the thing 1.4 found the wheel is paid for,
-  buying the stock after a fall. The VIX pause barely acts (the curve inverted on 65 of 1,223
-  sessions); vol sizing helped on 1.4's window and not after it.</p>
-
-<h2 id="winner"><span class="n">05</span>The winner</h2>
-<p class="blurb">1.4's wheel, with three changes. Decided on the last close, every night.</p>
-<div class="rules">
-  <div class="rule"><div class="tag">Wheel</div><div class="body">Flat: sell cash-secured puts on
-    the first monthly with ≥ 21 days, as many as the cash secures. Long: one call per 100
-    shares, same expiry rule, at or above the cost basis (1.4's basis rule). Buy a short back
-    once it costs half its premium.</div></div>
-  <div class="rule"><div class="tag">Earnings</div><div class="body">No new put or call whose
-    life spans Apple's next report date. <em>When LSEG has no forward date yet, the script
-    estimates one (last report + 91 days) and widens the blackout ten days early.</em></div></div>
-  <div class="rule"><div class="tag">OI strike</div><div class="body">Among strikes whose |delta|
-    is between 0.20 and 0.40, the one with the most open interest; ties to the nearest 0.30.
-    <em>Open interest is published the morning after, so the night's choice uses each contract's
-    latest report.</em></div></div>
-  <div class="rule"><div class="tag">Credit pause</div><div class="body">No new put while the
-    Baa–Treasury spread (FRED <code>BAA10Y</code>, the value published before the session) is above
-    its 200-day average. Calls are not paused: a covered call only lowers risk. <em>If FRED cannot be
-    read after three tries, no new put that night — a risk control that cannot be checked counts as on.</em></div></div>
-  <div class="rule"><div class="tag">Delta</div><div class="body">Computed, not read: implied
-    vol and Black-Scholes delta from each contract's last closing mid (1.3/1.4's
-    <code>greeks.py</code>), because Sanji rejects <code>delta:30</code> until Robin keeps
-    chain snapshots. The strike goes to Sanji as a bare number.</div></div>
+<h3>One order, in Sanji</h3>
+<div class="two">
+  <pre class="json" id="order-json">…</pre>
+  <ul class="facts" style="margin:0">
+    <li><code>SHT</code> sells to open; <code>expiry</code> and <code>strike</code> name the exact
+      contract, so Sanji needs no chain to find it.</li>
+    <li><code>lmt_prc: "mid"</code> — the midpoint of that option's quote at the open.</li>
+    <li>The <code>id</code> carries action, contract and session, so a second run the same night
+      writes the same id and Sanji fills it once.</li>
+    <li>Profit-takes go in as <code>BTC</code> limits at half the entry price.</li>
+  </ul>
 </div>
 
-<h3>Growth of $100,000</h3>
-<div class="legend" id="nav-legend"></div>
-<div class="panel"><div id="chart-nav" style="height:420px"></div></div>
-
-<h3>Year by year</h3>
-<div class="tablewrap" id="years"></div>
-<p class="tcap" id="years-cap"></p>
-
-<h3>Where the blackout earns its keep</h3>
-<p class="blurb">1.4's wheel, its 77 shorts split by whether their life spanned a report.
-  The damage is on the call side: a call held through a report is a bet that Apple does not
-  jump, and in this sample it did.</p>
-<div class="tablewrap" id="earn" style="max-width:820px"></div>
-<p class="tcap">Option P&amp;L per short (premium less the cost to close or the intrinsic at
-  assignment). The lab did not get to use this split: "calls only" was one of the settings,
-  ranked on 1.4's window, and it finished below "both sides".</p>
-
-<h3>No look-ahead</h3>
-<p class="blurb">1.4's test: cut every price series at a date, re-run from scratch, compare the
-  blotter up to that date. A rule that peeks at the future writes a different past when the
-  future is deleted.</p>
-<div class="tablewrap" id="lookahead" style="max-width:560px"></div>
-
-<h2 id="sanji"><span class="n">06</span>From the backtest to Sanji</h2>
-<p class="blurb">The backtest fills on the close of the session after the decision; Sanji
-  fills at the open, or inside the day's range for a limit. The rule is the same; the
-  plumbing differs, and each difference is written into <code>gearwheel/orders.py</code>.</p>
-<div class="tablewrap">
-<table>
-  <thead><tr><th class="l">Decision</th><th class="l">Sanji order</th><th class="l">Why it is written this way</th></tr></thead>
-  <tbody>
-    <tr><td class="l">sell the put</td><td class="l"><code>SHT put</code>, <code>expiry</code> = the date, <code>strike</code> = a number, <code>lmt_prc: "mid"</code></td>
-      <td class="wrapcell">The rule names an exact contract the night before; a dated expiry and a bare strike need no chain on Sanji's side. Mid at the open is where 1.4 measured AAPL options print.</td></tr>
-    <tr><td class="l">sell the call</td><td class="l"><code>SHT call</code>, same shape, strike ≥ basis</td>
-      <td class="wrapcell">Basis = the assigned put's strike less its premium, read back from <code>mkt/fills.json</code> by our own order ids.</td></tr>
-    <tr><td class="l">profit-take</td><td class="l"><code>BTC</code>, <code>lmt_prc</code> = half the entry premium</td>
-      <td class="wrapcell">A numeric limit needs no quote, and Sanji fills a buy limit when the day's low trades through it. The backtest rolls on one close; here the next short is sold the night after.</td></tr>
-    <tr><td class="l">credit pause</td><td class="l">no <code>SHT put</code> that night</td>
-      <td class="wrapcell">The spread is fetched from FRED each run; the value used is the last one dated before the decided session, exactly as in the backtest.</td></tr>
-    <tr><td class="l">assignment</td><td class="l">—</td>
-      <td class="wrapcell">Sanji applies it at the close; the next night reads shares in the book and writes the call.</td></tr>
-    <tr><td class="l">a run that starts late</td><td class="l">no new orders</td>
-      <td class="wrapcell">GitHub starts scheduled runs hours late on this repo. If the last close is not the session before the one being planned, Sanji has not resolved the book yet, and planning off it is the stale-book mistake his spec warns about.</td></tr>
-    <tr><td class="l">a book it cannot read</td><td class="l">no new orders</td>
-      <td class="wrapcell">Sanji has not written a <code>positions.json</code> yet, so its shape is unknown. The script reads the order schema's own fields and refuses anything else rather than guess a position.</td></tr>
-  </tbody>
-</table>
-</div>
-<p class="tcap">Orders for a session not yet resolved are kept when the file is rewritten, so a
-  second run the same day never pulls an order out from under Sanji; ids carry the action,
-  contract and session, so a re-run writes the same id and Sanji fills it once.</p>
-
-<h2 id="log"><span class="n">07</span>The nightly log</h2>
-<p class="blurb">One row per decision, appended by the Action — the forward test. The backtest
-  above ends where this begins.</p>
-<div class="tablewrap" id="logtable"></div>
-
-<h2 id="pipeline"><span class="n">08</span>The pipeline</h2>
+<h3>Safeguards</h3>
 <ul class="facts">
-  <li><b>Schedule.</b> 03:00 UTC Tue–Sat (10pm EST, the instructor's time) plans the next
-    session; 08:00 UTC retries. The LSEG account allows one sign-in at a time, so a run that
-    meets an open Workspace fails and the retry tries again; the site keeps the last state.</li>
-  <li><b>Secrets.</b> <code>LSEG_APP_KEY</code>, <code>LSEG_USERNAME</code>,
-    <code>LSEG_PASSWORD</code>, opened as a platform session without sign-on control, so the
-    job never logs the desktop app out.</li>
-  <li><b>Dry run.</b> "Run workflow" with <code>dry_run</code> decides and prints the orders
-    and commits nothing.</li>
-  <li><b>Deploy.</b> Pages builds from <code>main:/docs</code>; the bot's commit is the deploy.
-    The course server pushes <code>price_history.json</code> to the same branch, so the job
-    rebases before it pushes.</li>
-  <li><b>Underlying.</b> AAPL, conid 265598, added to this repo's <code>price_history.json</code>
-    so the course server tracks it (it seeds each repo with a random name; this one got
-    Alphabet). Same stock as 1.2–1.4, so the backtest evidence is about the thing traded.</li>
-  <li><b>Data.</b> 1.4's tape ended 30 Sep 2025; <code>gearwheel/backfill.py</code> carried it
-    to the last session before this pull with the same bands, fields and batching. The outside
-    series (CBOE VIX and VIX3M, FRED <code>BAA10Y</code>) are snapshotted in <code>gearwheel/ext/</code>
-    for the labs and fetched fresh by the nightly run.</li>
+  <li><b>Late runs.</b> GitHub starts scheduled runs hours late. If the last close is not the session
+    before the one being planned, Sanji has not updated the book yet, so no new orders are written.</li>
+  <li><b>Unknown book.</b> Sanji has not published a <code>positions.json</code> yet; if its shape is
+    not one the script understands, it writes no new orders rather than guess.</li>
+  <li><b>Missing data.</b> If FRED cannot be read, no new put that night.</li>
+  <li><b>No look-ahead.</b> Cutting every price series at a date and re-running gives the same trades
+    up to that date (1.4's test).</li>
 </ul>
 
+<h2 id="log"><span class="n">04</span>The nightly log</h2>
+<p class="blurb">One row per decision, appended by the Action.</p>
+<div class="tablewrap" id="logtable"></div>
+
 <footer>
-  <div>Reproduce: the lab and backtest from the cached tape, the orders against LSEG.</div>
-<pre>python -m gearwheel.backfill          # LSEG -> gearwheel/data.pkl (1.4's tape, carried forward)
-python -m gearwheel.lab               # 36 crossings, the selection rule -> docs/gear/lab.json
-python -m gearwheel.lab2              # 48 more, outside the course     -> docs/gear/lab2.json
-python -m gearwheel.backtest          # the winner in detail -> docs/gear/backtest.json
+  <div>Reproduce</div>
+<pre>python -m gearwheel.backfill          # LSEG -> gearwheel/data.pkl (1.4's tape, carried to Nov 2026)
+python -m gearwheel.backtest          # -> docs/gear/backtest.json
 python -m gearwheel.orders --dry-run  # tonight's decision, printed</pre>
   <div>
     <a href="1.4/">Assignment 1.4 · The Wheel</a> ·

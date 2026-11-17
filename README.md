@@ -11,7 +11,7 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The crossed wheel: a nightly GitHub Action that writes AAPL orders in Sanji to `open_orders.json`. The rule — 1.4's wheel + an earnings blackout + the open-interest strike + a credit-stress pause — was picked in two labs (36 course crossings, 48 outside ones) by selection rules fixed before each run. |
+| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The nightly wheel: a GitHub Action writes AAPL orders in Sanji to `open_orders.json` every weeknight — 1.4's wheel, no new option across earnings, no new put while the Baa-Treasury spread is above its 200-day average. |
 | 1.4 | [`wheel/`](wheel/) | [/1.4/](https://yangpuhan.github.io/Fintech535/1.4/) | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
 | 1.3 | [`pmcc/`](pmcc/) | [/1.3/](https://yangpuhan.github.io/Fintech535/1.3/) | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |
@@ -21,51 +21,40 @@ page rather than a new project.
 
 ---
 
-## Final — The Crossed Wheel
+## Final — The Nightly Wheel
 
-An algorithm is a function from inputs to open orders. This one runs every
-weeknight: `.github/workflows/nightly.yml` (03:00 UTC, retried 08:00 UTC)
-opens an LSEG platform session from repository secrets, and
-`gearwheel/orders.py` reads Sanji's book (`mkt/positions.json`; absent, the
-opening $100,000), decides, and writes the next session's orders in Sanji to
-`mkt/open_orders.json` and `open_orders.json`. The bot's commit republishes
-the page, which reads `docs/gear/*.json`.
+An algorithm is a function from inputs to open orders. Every weeknight
+`.github/workflows/nightly.yml` (03:00 UTC, retried 08:00 UTC) opens an LSEG
+platform session from repository secrets, and `gearwheel/orders.py` reads
+Sanji's book (`mkt/positions.json`; absent, the opening $100,000), decides,
+and writes the next session's orders to `mkt/open_orders.json` and
+`open_orders.json`. The bot's commit republishes the page, which reads
+`docs/gear/{backtest,state,log}.json`.
+
+The rule: 1.4's wheel (0.30-delta cash-secured puts on the first monthly
+>= 21 days out; calls at or above the basis; buy back at half the premium),
+plus **no new option across an earnings report** and **no new put while the
+Baa-Treasury spread (FRED `BAA10Y`) is above its 200-day average**.
+
+On 1.4's engine and data carried to 16 Nov 2026: 18.3% a year, Sharpe 0.83,
+worst drawdown -28.0%, against buy & hold's 14.9%, 0.49, -32.9%. Most of
+that lead is 2022; from January 2023 holding made +174% to the strategy's
++124% at about the same Sharpe. Read it as a lower-risk way to own AAPL.
 
 ```
 gearwheel/
   backfill.py   1.4's tape carried from 30 Sep 2025 to the last session  ->  data.pkl
-  signals.py    the trend/vol gear (the first hypothesis; rejected by the lab)
-  lab.py        36 crossings of four course parts on 1.4's engine, and the
-                selection rule  ->  docs/gear/lab.json
-  backtest.py   the winner in detail, look-ahead test  ->  docs/gear/backtest.json
+  external.py   FRED / CBOE series and the credit signal (snapshots in ext/)
+  backtest.py   the rule against 1.4's wheel and buy & hold  ->  docs/gear/backtest.json
   orders.py     tonight's decision  ->  open_orders.json, mkt/open_orders.json,
                 docs/gear/state.json, docs/gear/log.json
+  lab.py, lab2.py, signals.py
+                the experiments behind the rule (eight candidate additions,
+                84 combinations); not shown on the page
 ```
-
-The parts, each a switch on `wheel.book.run` (off by default, so 1.4 is
-unchanged): an earnings blackout (1.2), the gear (in-class realised vol;
-1.2-1.4 on calls), sell only when IV >= realised vol (1.4), and the strike
-with the most open interest in 0.20-0.40 |delta| (this week's OI clusters).
-The rule, fixed before the run: rank on 1.4's window (Jan 2022 - Sep 2025)
-by Sharpe; of the top five, the first that beats 1.4's wheel on the new tape
-(Oct 2025 on) and in 6 of 9 delta x fill robustness cells. It picked
-**1.4's wheel + earnings blackout + OI strike**: 18.13% a year, Sharpe 0.76,
-against the wheel's 14.71% and 0.63; +34.1% on the new tape against +20.2%.
-The gear and the IV filter lost almost everywhere.
-
-A second lab (`lab2.py`) took that winner as the bar and added parts from
-outside the course: a VIX term-structure pause (CBOE), a credit pause (FRED
-`BAA10Y` above its 200-day average), volatility-managed sizing (Moreira &
-Muir 2017), and a defensive roll at delta -0.70. 48 candidates, judged on
-Sharpe by a rule fixed in advance. It added the **credit pause**: Sharpe
-0.76 -> 0.80, max drawdown -27.0% -> -23.9%, new-tape Sharpe 1.78 -> 1.82,
-for a lower CAGR (16.09%). That is what trades now. The external series are
-snapshotted in `gearwheel/ext/` and fetched fresh each night.
 
 ```bash
 python -m gearwheel.backfill          # needs LSEG Workspace
-python -m gearwheel.lab
-python -m gearwheel.lab2
 python -m gearwheel.backtest
 python -m gearwheel.orders --dry-run  # Workspace locally, or the platform secrets
 ```

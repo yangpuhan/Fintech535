@@ -1,10 +1,9 @@
 """
-Tonight's orders: the crossed wheel, written in Sanji.
+Tonight's orders: the nightly wheel, written in Sanji.
 
-The rule is the one gearwheel/lab.py selected from 36 crossings of the
-course's parts: 1.4's wheel + the earnings blackout + the open-interest
-strike. (The package keeps its first hypothesis's name, the gear, which the
-lab rejected; its signals are still computed and published.)
+The rule is 1.4's wheel + an earnings blackout + a credit pause (no new put
+while the Baa-Treasury spread is above its 200-day average). The package
+keeps its first hypothesis's name, the gear, which testing rejected.
 
     python -m gearwheel.orders              # pull, decide, write the files
     python -m gearwheel.orders --dry-run    # pull, decide, print; write nothing
@@ -27,8 +26,8 @@ Outputs
     docs/gear/state.json   tonight's signals, book, decision and orders
     docs/gear/log.json     one row per decision date: the forward record
 
-The rule is wheel.book.run with the lab's switches (earnings=both sides,
-oi_wall=True), decided on the last close, as in the backtest. Three things differ, all because Sanji is not the
+The rule is wheel.book.run with earnings (both sides) and the credit pause
+switched on, decided on the last close, as in the backtest. Three things differ, all because Sanji is not the
 backtest's tape: a fill is at the open or inside the day's range, not on the
 close; a profit-take closes tonight and the next put or call is sold the
 night after (the backtest rolls on one close); and the strike is chosen from
@@ -74,17 +73,17 @@ TAKE = 0.50
 # arrive by assignment (variant B); True buys them at the open (variant A).
 # Chosen by the backtest, which tested both; see docs/gear/backtest.json.
 HOLD_BUYS = False
-# The parts the lab (gearwheel/lab.py) selected, by the rule fixed before it
-# ran: 1.4's wheel + the earnings blackout + the open-interest strike. The
-# gear lost in the lab; its signals are still computed and published, but
-# with USE_GEAR False every night is the wheel.
+# The rule: 1.4's wheel + the earnings blackout + the credit pause. The labs
+# (gearwheel/lab.py, lab2.py) also tested a trend/vol gear, an IV filter, the
+# open-interest strike, a VIX pause, vol sizing and a defensive roll; the gear
+# and the OI strike stay here as switches, off. The gear's signals are still
+# computed and logged.
 USE_GEAR = False
 EARNINGS_BLACKOUT = True
-OI_STRIKE = True
-# The second lab (gearwheel/lab2.py), ideas from outside the course, added one
-# part by the same kind of rule: no new put while the Baa-Treasury spread
-# (FRED) is above its 200-day average. If FRED cannot be read, no new put:
-# a risk control that cannot be checked is treated as on.
+OI_STRIKE = False
+# No new put while the Baa-Treasury spread (FRED) is above its 200-day
+# average. If FRED cannot be read, no new put: a risk control that cannot be
+# checked is treated as on.
 CREDIT_PAUSE = True
 HISTORY_DAYS = 800             # calendar days of closes: 200 + 252 + 21 sessions, padded
 OPEN_NY = dt.time(9, 30)
