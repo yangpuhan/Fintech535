@@ -59,7 +59,7 @@ jobs:
         continue-on-error: true     # the orders do not depend on the chart
         run: python -m nightly.refresh
 
-      - name: Decide tomorrow's orders (the gear wheel)
+      - name: Decide tomorrow's orders (gearwheel/orders.py)
         id: orders
         run: python -m gearwheel.orders ${{ inputs.dry_run && '--dry-run' || '' }}
 

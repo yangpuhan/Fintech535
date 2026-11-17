@@ -339,7 +339,9 @@ def pull_chain(ld, right: str, expiry: dt.date, S: float, floor: float | None,
     got = got[got["date"].dt.date == decided].copy()
     got["strike"] = got["ric"].map(rics)
     for c in ("BID", "ASK", "OPINT_1"):
-        got[c] = pd.to_numeric(got.get(c), errors="coerce")
+        # LSEG hands back nullable dtypes; plain floats keep NaN tests simple
+        col = got[c] if c in got else pd.Series(np.nan, index=got.index)
+        got[c] = pd.to_numeric(col, errors="coerce").astype(float)
     two = got["BID"].notna() & got["ASK"].notna() & (got["ASK"] >= got["BID"]) & (got["BID"] > 0)
     got = got[two].copy()
     got["mid"] = (got["BID"] + got["ASK"]) / 2
@@ -347,7 +349,10 @@ def pull_chain(ld, right: str, expiry: dt.date, S: float, floor: float | None,
     is_call = right == "C"
     got["iv"] = implied_vol(got["mid"], S, got["strike"], T, r, q, is_call)
     got["delta"] = bs_delta(S, got["strike"], T, r, q, got["iv"], is_call)
-    return got.dropna(subset=["delta"]).sort_values("strike").reset_index(drop=True)
+    got = got.dropna(subset=["delta"]).sort_values("strike").reset_index(drop=True)
+    print(f"chain {right} {expiry}: {len(got)} two-sided quotes on {decided}, "
+          f"{int(got['OPINT_1'].notna().sum())} with open interest")
+    return got
 
 
 def pick(chain: pd.DataFrame, target: float, floor: float | None = None):
