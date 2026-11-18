@@ -1,6 +1,6 @@
 {
   "decided": "2026-11-17",
-  "for": "2026-11-18",
+  "for": "2026-11-19",
   "spot": 351.91,
   "gear": "wheel",
   "signals": {
@@ -32,41 +32,16 @@
     "baa_ma": 1.606,
     "asof": "2026-11-16"
   },
-  "pick": {
-    "right": "P",
-    "expiry": "2026-12-18",
-    "strike": 340,
-    "delta": -0.307,
-    "iv": 27.9,
-    "bid": 5.75,
-    "oi": 16601,
-    "ask": 6.0,
-    "mid": 5.88,
-    "quotes": 18
-  },
-  "orders": [
-    {
-      "id": "aapl-sht-p-20261218-340-2026-11-18",
-      "for": "2026-11-18",
-      "order_type": "lmt",
-      "action": "SHT",
-      "qty": 2,
-      "underlying": 265598,
-      "contract": "put",
-      "expiry": "2026-12-18",
-      "strike": 340,
-      "ref": "open",
-      "lmt_prc": "mid"
-    }
-  ],
+  "pick": null,
+  "orders": [],
   "why": [
     "gear WHEEL: close 351.91 above its 200-day average 302.13; 21-day vol 27.2% above its 1-year median 22.8%",
-    "credit calm: Baa-Treasury spread 1.50 (as of 2026-11-16) is below its 200-day average 1.61",
-    "flat: sell 2 2026-12-18 340 put (delta -0.31, IV 27.9%, last mid 5.88), secured by $68,000"
+    "stale: the last close is 2026-11-17, but 2026-11-19 follows 2026-11-18, which Sanji has not resolved yet. No new orders this run."
   ],
-  "generated_utc": "2026-11-18T11:02:35Z",
+  "stale": true,
+  "generated_utc": "2026-11-18T16:55:05Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44290902470",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44352627632",
   "open_orders": [
     {
       "id": "aapl-sht-p-20261218-340-2026-11-18",
