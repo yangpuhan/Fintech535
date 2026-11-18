@@ -1,13 +1,13 @@
 {
-  "decided": "2026-11-16",
+  "decided": "2026-11-17",
   "for": "2026-11-18",
-  "spot": 352.78,
+  "spot": 351.91,
   "gear": "wheel",
   "signals": {
-    "close": 352.78,
-    "sma": 301.72,
-    "rv": 27.1,
-    "rv_median": 22.7,
+    "close": 351.91,
+    "sma": 302.13,
+    "rv": 27.2,
+    "rv_median": 22.8,
     "up": true,
     "calm": false,
     "ma": 200,
@@ -28,24 +28,49 @@
   },
   "credit": {
     "stress": false,
-    "baa": 1.47,
-    "baa_ma": 1.607,
-    "asof": "2026-11-13"
+    "baa": 1.5,
+    "baa_ma": 1.606,
+    "asof": "2026-11-16"
   },
-  "pick": null,
-  "orders": [],
-  "why": [
-    "gear WHEEL: close 352.78 above its 200-day average 301.72; 21-day vol 27.1% above its 1-year median 22.7%",
-    "stale: the last close is 2026-11-16, but 2026-11-18 follows 2026-11-17, which Sanji has not resolved yet. No new orders this run."
+  "pick": {
+    "right": "P",
+    "expiry": "2026-12-18",
+    "strike": 340,
+    "delta": -0.307,
+    "iv": 27.9,
+    "bid": 5.75,
+    "oi": 16601,
+    "ask": 6.0,
+    "mid": 5.88,
+    "quotes": 18
+  },
+  "orders": [
+    {
+      "id": "aapl-sht-p-20261218-340-2026-11-18",
+      "for": "2026-11-18",
+      "order_type": "lmt",
+      "action": "SHT",
+      "qty": 2,
+      "underlying": 265598,
+      "contract": "put",
+      "expiry": "2026-12-18",
+      "strike": 340,
+      "ref": "open",
+      "lmt_prc": "mid"
+    }
   ],
-  "stale": true,
-  "generated_utc": "2026-11-17T17:20:07Z",
+  "why": [
+    "gear WHEEL: close 351.91 above its 200-day average 302.13; 21-day vol 27.2% above its 1-year median 22.8%",
+    "credit calm: Baa-Treasury spread 1.50 (as of 2026-11-16) is below its 200-day average 1.61",
+    "flat: sell 2 2026-12-18 340 put (delta -0.31, IV 27.9%, last mid 5.88), secured by $68,000"
+  ],
+  "generated_utc": "2026-11-18T11:02:35Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44135716074",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44290902470",
   "open_orders": [
     {
-      "id": "aapl-sht-p-20261218-340-2026-11-17",
-      "for": "2026-11-17",
+      "id": "aapl-sht-p-20261218-340-2026-11-18",
+      "for": "2026-11-18",
       "order_type": "lmt",
       "action": "SHT",
       "qty": 2,
