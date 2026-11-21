@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-11-21T10:36:58Z",
+  "generated_utc": "2026-11-21T15:52:41Z",
   "session": "platform",
   "through": "2026-11-20",
   "aapl_close": 342.56,
@@ -8,8 +8,8 @@
   "spy_rv": 25.9,
   "window": 21,
   "run": {
-    "number": 20,
-    "url": "https://github.com/yangpuhan/Fintech535/actions/runs/44895151372",
+    "number": 21,
+    "url": "https://github.com/yangpuhan/Fintech535/actions/runs/44921462983",
     "event": "schedule"
   }
 }

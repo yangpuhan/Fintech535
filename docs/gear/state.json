@@ -64,9 +64,9 @@
     "credit calm: Baa-Treasury spread 1.56 (as of 2026-11-19) is below its 200-day average 1.60",
     "flat: sell 3 2026-12-18 330 put (delta -0.31, IV 33.5%, last mid 6.80), secured by $99,000"
   ],
-  "generated_utc": "2026-11-21T10:37:06Z",
+  "generated_utc": "2026-11-21T15:52:50Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44895151372",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44921462983",
   "open_orders": [
     {
       "id": "aapl-sht-p-20261218-330-2026-11-23",
