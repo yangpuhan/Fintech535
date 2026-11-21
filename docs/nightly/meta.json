@@ -1,15 +1,15 @@
 {
-  "generated_utc": "2026-11-20T16:39:05Z",
+  "generated_utc": "2026-11-21T10:36:58Z",
   "session": "platform",
-  "through": "2026-11-19",
-  "aapl_close": 349.21,
-  "spy_close": 715.87,
-  "aapl_rv": 26.8,
-  "spy_rv": 23.3,
+  "through": "2026-11-20",
+  "aapl_close": 342.56,
+  "spy_close": 689.81,
+  "aapl_rv": 27.3,
+  "spy_rv": 25.9,
   "window": 21,
   "run": {
-    "number": 19,
-    "url": "https://github.com/yangpuhan/Fintech535/actions/runs/44775426302",
+    "number": 20,
+    "url": "https://github.com/yangpuhan/Fintech535/actions/runs/44895151372",
     "event": "schedule"
   }
 }

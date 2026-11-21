@@ -1,13 +1,13 @@
 {
-  "decided": "2026-11-19",
+  "decided": "2026-11-20",
   "for": "2026-11-23",
-  "spot": 349.21,
+  "spot": 342.56,
   "gear": "wheel",
   "signals": {
-    "close": 349.21,
-    "sma": 302.91,
-    "rv": 26.8,
-    "rv_median": 22.9,
+    "close": 342.56,
+    "sma": 303.24,
+    "rv": 27.3,
+    "rv_median": 23.0,
     "up": true,
     "calm": false,
     "ma": 200,
@@ -28,31 +28,56 @@
   },
   "credit": {
     "stress": false,
-    "baa": 1.52,
+    "baa": 1.56,
     "baa_ma": 1.605,
-    "asof": "2026-11-18"
+    "asof": "2026-11-19"
   },
-  "pick": null,
-  "orders": [],
-  "why": [
-    "gear WHEEL: close 349.21 above its 200-day average 302.91; 21-day vol 26.8% above its 1-year median 22.9%",
-    "stale: the last close is 2026-11-19, but 2026-11-23 follows 2026-11-20, which Sanji has not resolved yet. No new orders this run."
-  ],
-  "stale": true,
-  "generated_utc": "2026-11-20T16:39:16Z",
-  "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44775426302",
-  "open_orders": [
+  "pick": {
+    "right": "P",
+    "expiry": "2026-12-18",
+    "strike": 330,
+    "delta": -0.315,
+    "iv": 33.5,
+    "bid": 6.6,
+    "oi": 33230,
+    "ask": 7.0,
+    "mid": 6.8,
+    "quotes": 19
+  },
+  "orders": [
     {
-      "id": "aapl-sht-p-20261218-335-2026-11-20",
-      "for": "2026-11-20",
+      "id": "aapl-sht-p-20261218-330-2026-11-23",
+      "for": "2026-11-23",
       "order_type": "lmt",
       "action": "SHT",
-      "qty": 2,
+      "qty": 3,
       "underlying": 265598,
       "contract": "put",
       "expiry": "2026-12-18",
-      "strike": 335,
+      "strike": 330,
+      "ref": "open",
+      "lmt_prc": "mid"
+    }
+  ],
+  "why": [
+    "gear WHEEL: close 342.56 above its 200-day average 303.24; 21-day vol 27.3% above its 1-year median 23.0%",
+    "credit calm: Baa-Treasury spread 1.56 (as of 2026-11-19) is below its 200-day average 1.60",
+    "flat: sell 3 2026-12-18 330 put (delta -0.31, IV 33.5%, last mid 6.80), secured by $99,000"
+  ],
+  "generated_utc": "2026-11-21T10:37:06Z",
+  "session": "platform",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44895151372",
+  "open_orders": [
+    {
+      "id": "aapl-sht-p-20261218-330-2026-11-23",
+      "for": "2026-11-23",
+      "order_type": "lmt",
+      "action": "SHT",
+      "qty": 3,
+      "underlying": 265598,
+      "contract": "put",
+      "expiry": "2026-12-18",
+      "strike": 330,
       "ref": "open",
       "lmt_prc": "mid"
     }
