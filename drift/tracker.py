@@ -62,8 +62,22 @@ def third_friday(after: dt.date) -> dt.date:
         d = dt.date(d.year + (d.month == 12), d.month % 12 + 1, 1)
 
 
-def _hist(ld, rics, fields, start, end):
-    df = ld.get_history(universe=rics, fields=fields, interval="1D", start=str(start), end=str(end))
+def _retry(fn, tries: int = 3, wait: float = 20.0):
+    """The platform endpoints time out now and then (24 Nov 2026: a report-date
+    query read-timed-out in CI while the bars came back); try again."""
+    import time
+    for i in range(tries):
+        try:
+            return fn()
+        except Exception as e:
+            if i == tries - 1:
+                raise
+            print(f"  LSEG: {str(e)[:80]}; retrying in {wait:.0f}s")
+            time.sleep(wait)
+
+
+def _hist(ld, rics, fields, start, end, tries: int = 3):
+    df = _retry(lambda: ld.get_history(universe=rics, fields=fields, interval="1D", start=str(start), end=str(end)), tries)
     if df is None or df.empty:
         return pd.DataFrame()
     if not isinstance(df.columns, pd.MultiIndex):
@@ -91,7 +105,7 @@ def update(ld) -> str:
     O, Cl = core.panel(bars, "open"), core.panel(bars, "close")
     open_names = [t["name"] for t in core.trades(ev, O, Cl, True) if not t["closed"]]
     names = sorted(set(core.tick(r) for r in u["top20"][year]) | set(open_names) | {"SPY"})
-    last = bars["date"].max()
+    last = pd.Timestamp(bars["date"].max())
 
     # (a) bars ------------------------------------------------------------
     start = (last - pd.Timedelta(days=10)).date()
@@ -120,15 +134,35 @@ def update(ld) -> str:
     bars = bars[bars["date"].isin(spy_days)]
 
     # (b) T-bill yield -------------------------------------------------------
-    rt = _hist(ld, ["US3MT=RR"], ["MID_YLD_1", "B_YLD_1"], (rate.index.max() - pd.Timedelta(days=10)).date(), today)
+    rt = _hist(ld, ["US3MT=RR"], ["MID_YLD_1", "B_YLD_1"], (pd.Timestamp(rate.index.max()) - pd.Timedelta(days=10)).date(), today)
     if not rt.empty:
         y = rt["US3MT=RR"]["MID_YLD_1"].fillna(rt["US3MT=RR"]["B_YLD_1"]).dropna().rename("yield")
         rate = pd.concat([rate[~rate.index.isin(y.index)], y]).sort_index()
 
-    # (c) new reports --------------------------------------------------------
+    _save(ev, bars, rate)
+    try:
+        added = _reports(ld, u, ev, bars, ric_of, year, today)
+    except Exception as e:                            # keep tonight's bars; try the reports again tomorrow
+        print(f"  report dates unavailable tonight: {str(e)[:120]}")
+        return f"report dates unavailable tonight; bars through {bars['date'].max().date()}"
+    if added:
+        ev = pd.concat([ev, pd.DataFrame(added)]).sort_values(["t1", "name"])
+        _save(ev, bars, rate)
+    return f"{len(added)} new report(s); bars through {bars['date'].max().date()}"
+
+
+def _save(ev, bars, rate) -> None:
+    ev.assign(t0=pd.to_datetime(ev["t0"]).dt.date, t1=pd.to_datetime(ev["t1"]).dt.date).to_csv(core.DATA / "events.csv", index=False)
+    bars.assign(date=pd.to_datetime(bars["date"]).dt.date).to_csv(core.DATA / "bars.csv.gz", index=False, float_format="%.4f")
+    rate.rename_axis("date").to_frame("yield").to_csv(core.DATA / "rate.csv", float_format="%.4f")
+
+
+def _reports(ld, u, ev, bars, ric_of, year, today) -> list[dict]:
+    """(c) reports whose reaction day has closed and that are not recorded yet."""
     rics = [ric_of[core.tick(r)] for r in u["top20"][year]]
-    since = (ev["t1"].max() - pd.Timedelta(days=45)).date()
-    rep = ld.get_data(rics, ["TR.EPSActReportDate"], {"SDate": str(since), "EDate": str(today), "Period": "FQ0", "Frq": "FQ"})
+    since = (pd.Timestamp(ev["t1"].max()) - pd.Timedelta(days=45)).date()
+    rep = _retry(lambda: ld.get_data(rics, ["TR.EPSActReportDate"],
+                                     {"SDate": str(since), "EDate": str(today), "Period": "FQ0", "Frq": "FQ"}))
     rep.columns = ["ric", "report"]
     O, Cl = core.panel(bars, "open"), core.panel(bars, "close")
     sess = Cl.index
@@ -154,7 +188,8 @@ def update(ld) -> str:
             for k in (near, other):
                 legs = [option_ric(root, exp, k, rt_, today) for rt_ in ("C", "P")]
                 try:
-                    opt = _hist(ld, legs, ["BID", "ASK"], (t0 - pd.Timedelta(days=5)).date(), (t0 + pd.Timedelta(days=1)).date())
+                    opt = _hist(ld, legs, ["BID", "ASK"], (t0 - pd.Timedelta(days=5)).date(),
+                               (t0 + pd.Timedelta(days=1)).date(), tries=1)   # a missing RIC is normal
                 except Exception:
                     opt = pd.DataFrame()
                 if not opt.empty and set(legs) <= set(opt.columns.get_level_values(0)):
@@ -170,14 +205,7 @@ def update(ld) -> str:
         added.append(dict(name=n, rank=rank, report=str(ts), timing=timing, t0=t0, t1=t1, strike=k_used,
                           implied=round(imp, 4), move=round((Cl.at[t1, n] / Cl.at[t0, n] - 1) * 100, 4)))
         print(f"  new report {n} reacted {t1.date()}: implied {imp:.2f}% move {added[-1]['move']:+.2f}%")
-    if added:
-        ev = pd.concat([ev, pd.DataFrame(added)]).sort_values(["t1", "name"])
-
-    ev.assign(t0=ev["t0"].dt.date if hasattr(ev["t0"], "dt") else ev["t0"],
-              t1=pd.to_datetime(ev["t1"]).dt.date).to_csv(core.DATA / "events.csv", index=False)
-    bars.assign(date=pd.to_datetime(bars["date"]).dt.date).to_csv(core.DATA / "bars.csv.gz", index=False, float_format="%.4f")
-    rate.rename_axis("date").to_frame("yield").to_csv(core.DATA / "rate.csv", float_format="%.4f")
-    return f"{len(added)} new report(s); bars through {bars['date'].max().date()}"
+    return added
 
 
 def main() -> None:
@@ -190,6 +218,10 @@ def main() -> None:
         sys.path.insert(0, str(core.ROOT))
         from nightly.refresh import open_session
         session, kind = open_session(ld)
+        try:
+            ld.get_config()["http.request-timeout"] = 120
+        except Exception:
+            pass
         try:
             note = update(ld)
         finally:
