@@ -11,7 +11,8 @@ page rather than a new project.
 
 | # | Module | Page | What it does |
 |---|---|---|---|
-| Final | [`gearwheel/`](gearwheel/) | **[/](https://yangpuhan.github.io/Fintech535/)** | The nightly wheel: a GitHub Action writes AAPL orders in Sanji to `open_orders.json` every weeknight — 1.4's wheel, no new option across earnings, no new put while the Baa-Treasury spread is above its 200-day average. |
+| Thesis | [`drift/`](drift/) | **[/](https://yangpuhan.github.io/Fintech535/)** | Final project, checkpoint 1: when a top-20 company moves more on earnings than its options priced, follow the move for 20 sessions, hedged with SPY. Thesis, horizon, wrong-if conditions, alpha and costs, macro; the tracker is rebuilt every weeknight by the same Action. |
+| Final | [`gearwheel/`](gearwheel/) | [/final/](https://yangpuhan.github.io/Fintech535/final/) | The nightly wheel: a GitHub Action writes AAPL orders in Sanji to `open_orders.json` every weeknight — 1.4's wheel, no new option across earnings, no new put while the Baa-Treasury spread is above its 200-day average. |
 | 1.4 | [`wheel/`](wheel/) | [/1.4/](https://yangpuhan.github.io/Fintech535/1.4/) | A mechanical wheel on AAPL — cash-secured puts, assignment, covered calls, called away — Jan 2022 – Sep 2025, a $100,000 cash account, fills measured on the hourly tape. |
 | 1.3 | [`pmcc/`](pmcc/) | [/1.3/](https://yangpuhan.github.io/Fintech535/1.3/) | A mechanical Poor Man's Covered Call on AAPL, Jan 2022 – Oct 2026, daily LSEG closes, against a covered call writing the identical calls. |
 | 1.2 | [`covered_call/`](covered_call/) | [/1.2/](https://yangpuhan.github.io/Fintech535/1.2/) | Ten weeks of a mechanical AAPL covered call on hourly LSEG bars: blotter, ledger, Reg T, and the evidence for filling at the mid. |

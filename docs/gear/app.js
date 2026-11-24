@@ -19,8 +19,10 @@
   const pct = (x, d = 1) => (x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(d) + '%');
   const num = (x, d = 2) => (x == null ? '—' : (x < 0 ? '−' : '') + Math.abs(Number(x)).toFixed(d));
 
+  // The data sits beside this script (docs/gear/); the page that loads it lives elsewhere (docs/final/).
+  const BASE = new URL('..', document.currentScript.src).href;
   async function get(path, fresh) {
-    const r = await fetch(path + (fresh ? '?t=' + Date.now() : ''), { cache: fresh ? 'no-store' : 'default' });
+    const r = await fetch(new URL(path, BASE).href + (fresh ? '?t=' + Date.now() : ''), { cache: fresh ? 'no-store' : 'default' });
     if (!r.ok) throw new Error(path + ': HTTP ' + r.status);
     return r.json();
   }

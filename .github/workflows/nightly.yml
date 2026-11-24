@@ -63,6 +63,12 @@ jobs:
         id: orders
         run: python -m gearwheel.orders ${{ inputs.dry_run && '--dry-run' || '' }}
 
+      - name: Update the thesis tracker (drift/tracker.py)
+        id: drift
+        if: ${{ !cancelled() }}
+        continue-on-error: true     # the orders above do not depend on it
+        run: python -m drift.tracker
+
       - name: Commit and push
         if: ${{ !inputs.dry_run && !cancelled() }}
         run: |
@@ -70,6 +76,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/nightly/aapl-vol.html docs/nightly/meta.json \
                   open_orders.json mkt/open_orders.json docs/gear/state.json docs/gear/log.json \
+                  docs/drift/tracker.json drift/data/events.csv drift/data/bars.csv.gz \
+                  drift/data/rate.csv drift/data/universe.json \
                   2>/dev/null || true
           if git diff --cached --quiet; then
             echo "nothing changed; nothing to commit"
