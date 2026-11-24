@@ -1,13 +1,13 @@
 {
-  "decided": "2026-11-20",
-  "for": "2026-11-23",
-  "spot": 342.56,
+  "decided": "2026-11-24",
+  "for": "2026-11-25",
+  "spot": 354.07,
   "gear": "wheel",
   "signals": {
-    "close": 342.56,
-    "sma": 303.24,
-    "rv": 27.3,
-    "rv_median": 23.0,
+    "close": 354.07,
+    "sma": 303.99,
+    "rv": 28.2,
+    "rv_median": 23.2,
     "up": true,
     "calm": false,
     "ma": 200,
@@ -15,7 +15,7 @@
     "lookback": 252
   },
   "earnings": {
-    "next": "2027-02-01",
+    "next": null,
     "estimated": true
   },
   "book": {
@@ -28,56 +28,56 @@
   },
   "credit": {
     "stress": false,
-    "baa": 1.56,
+    "baa": 1.59,
     "baa_ma": 1.605,
-    "asof": "2026-11-19"
+    "asof": "2026-11-23"
   },
   "pick": {
     "right": "P",
     "expiry": "2026-12-18",
-    "strike": 330,
-    "delta": -0.315,
-    "iv": 33.5,
-    "bid": 6.6,
-    "oi": 33230,
-    "ask": 7.0,
-    "mid": 6.8,
-    "quotes": 19
+    "strike": 342.5,
+    "delta": -0.29,
+    "iv": 26.9,
+    "bid": 4.45,
+    "oi": 30,
+    "ask": 4.75,
+    "mid": 4.6,
+    "quotes": 28
   },
   "orders": [
     {
-      "id": "aapl-sht-p-20261218-330-2026-11-23",
-      "for": "2026-11-23",
+      "id": "aapl-sht-p-20261218-342.5-2026-11-25",
+      "for": "2026-11-25",
       "order_type": "lmt",
       "action": "SHT",
-      "qty": 3,
+      "qty": 2,
       "underlying": 265598,
       "contract": "put",
       "expiry": "2026-12-18",
-      "strike": 330,
+      "strike": 342.5,
       "ref": "open",
       "lmt_prc": "mid"
     }
   ],
   "why": [
-    "gear WHEEL: close 342.56 above its 200-day average 303.24; 21-day vol 27.3% above its 1-year median 23.0%",
-    "credit calm: Baa-Treasury spread 1.56 (as of 2026-11-19) is below its 200-day average 1.60",
-    "flat: sell 3 2026-12-18 330 put (delta -0.31, IV 33.5%, last mid 6.80), secured by $99,000"
+    "gear WHEEL: close 354.07 above its 200-day average 303.99; 21-day vol 28.2% above its 1-year median 23.2%",
+    "credit calm: Baa-Treasury spread 1.59 (as of 2026-11-23) is below its 200-day average 1.60",
+    "flat: sell 2 2026-12-18 342.5 put (delta -0.29, IV 26.9%, last mid 4.60), secured by $68,500"
   ],
-  "generated_utc": "2026-11-21T15:52:50Z",
+  "generated_utc": "2026-11-24T23:06:32Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/44921462983",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/45506810844",
   "open_orders": [
     {
-      "id": "aapl-sht-p-20261218-330-2026-11-23",
-      "for": "2026-11-23",
+      "id": "aapl-sht-p-20261218-342.5-2026-11-25",
+      "for": "2026-11-25",
       "order_type": "lmt",
       "action": "SHT",
-      "qty": 3,
+      "qty": 2,
       "underlying": 265598,
       "contract": "put",
       "expiry": "2026-12-18",
-      "strike": 330,
+      "strike": 342.5,
       "ref": "open",
       "lmt_prc": "mid"
     }
