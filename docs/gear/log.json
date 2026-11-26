@@ -66,5 +66,16 @@
     "rv_median": 23.2,
     "orders": [],
     "why": "stale: the last close is 2026-11-24, but 2026-11-27 follows 2026-11-25, which Sanji has not resolved yet. No new orders this run."
+  },
+  {
+    "decided": "2026-11-25",
+    "for": "2026-11-27",
+    "gear": "wheel",
+    "close": 355.58,
+    "sma": 304.4,
+    "rv": 28.1,
+    "rv_median": 23.3,
+    "orders": [],
+    "why": "credit pause: Baa-Treasury spread 1.61 (as of 2026-11-24) is above its 200-day average 1.60: no new put tonight"
   }
 ]
