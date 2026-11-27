@@ -1,6 +1,6 @@
 {
   "decided": "2026-11-25",
-  "for": "2026-11-27",
+  "for": "2026-11-30",
   "spot": 355.58,
   "gear": "wheel",
   "signals": {
@@ -36,10 +36,11 @@
   "orders": [],
   "why": [
     "gear WHEEL: close 355.58 above its 200-day average 304.40; 21-day vol 28.1% above its 1-year median 23.3%",
-    "credit pause: Baa-Treasury spread 1.61 (as of 2026-11-24) is above its 200-day average 1.60: no new put tonight"
+    "stale: the last close is 2026-11-25, but 2026-11-30 follows 2026-11-27, which Sanji has not resolved yet. No new orders this run."
   ],
-  "generated_utc": "2026-11-27T11:42:49Z",
+  "stale": true,
+  "generated_utc": "2026-11-27T17:48:35Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/45992626782",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/46044637409",
   "open_orders": []
 }
