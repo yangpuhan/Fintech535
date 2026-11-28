@@ -1,12 +1,12 @@
 {
-  "decided": "2026-11-25",
+  "decided": "2026-11-27",
   "for": "2026-11-30",
-  "spot": 355.58,
+  "spot": 358.54,
   "gear": "wheel",
   "signals": {
-    "close": 355.58,
-    "sma": 304.4,
-    "rv": 28.1,
+    "close": 358.54,
+    "sma": 304.82,
+    "rv": 27.9,
     "rv_median": 23.3,
     "up": true,
     "calm": false,
@@ -27,20 +27,17 @@
     "premium": null
   },
   "credit": {
-    "stress": true,
-    "baa": 1.61,
-    "baa_ma": 1.605,
-    "asof": "2026-11-24"
+    "stress": null,
+    "error": "FRED BAA10Y not read: The read operation timed out"
   },
   "pick": null,
   "orders": [],
   "why": [
-    "gear WHEEL: close 355.58 above its 200-day average 304.40; 21-day vol 28.1% above its 1-year median 23.3%",
-    "stale: the last close is 2026-11-25, but 2026-11-30 follows 2026-11-27, which Sanji has not resolved yet. No new orders this run."
+    "gear WHEEL: close 358.54 above its 200-day average 304.82; 21-day vol 27.9% above its 1-year median 23.3%",
+    "credit signal unavailable (FRED BAA10Y not read: The read operation timed out): no new put tonight"
   ],
-  "stale": true,
-  "generated_utc": "2026-11-27T17:48:35Z",
+  "generated_utc": "2026-11-28T11:21:12Z",
   "session": "platform",
-  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/46044637409",
+  "run": "https://github.com/yangpuhan/Fintech535/actions/runs/46139208562",
   "open_orders": []
 }
